@@ -1,0 +1,67 @@
+[← Back to Documentation Index](README.md)
+
+# Emulator guide
+
+## Running a game
+
+```bash
+dotnet run --project Px86.NintendoDS.Emulator -c Release -- "path/to/My Game.nds"
+```
+
+You can also publish a self-contained build (`dotnet publish Px86.NintendoDS.Emulator -c Release -r win-x64 --self-contained`)
+and drag a `.nds` file onto `Px86.NintendoDS.Emulator.exe`.
+
+Use your own legally made dumps of your cartridges. Nothing copyrighted ships with the emulator.
+
+## BIOS and firmware (optional)
+
+By default the emulator **direct-boots** the game with a built-in high-level BIOS, so no dump files are needed.
+If you have dumps from your own console, you can point the emulator at them:
+
+```bash
+... -- game.nds --bios9 bios9.bin --bios7 bios7.bin --firmware firmware.bin            # BIOS used for SWIs, still direct boot
+... -- game.nds --bios9 bios9.bin --bios7 bios7.bin --firmware firmware.bin --real-bios # full boot through the firmware
+... --save-settings                                                                     # remember these paths
+```
+
+With a firmware dump, your nickname, language and touch-screen calibration come from your console.
+
+## Controls
+
+| DS | Keyboard | Gamepad |
+|---|---|---|
+| D-pad | Arrow keys | D-pad / left stick |
+| A / B / X / Y | X / Z / S / A | East / South / North / West |
+| L / R | Q / W | Shoulders |
+| Start / Select | Enter / Backspace | Start / Back |
+| Touch screen | Left mouse button on the bottom screen | — |
+| Fast-forward | Hold Tab | Right trigger |
+| Pause | P | — |
+| Fullscreen | F11 | — |
+| Screenshot | F12 (saved to Pictures/Px86.NintendoDS) | — |
+| Quit | Esc | — |
+
+Keyboard bindings can be changed in `settings.json` (`KeyBindings` maps a Silk.NET key name to a DS button).
+
+## Saves
+
+The emulator saves to `<game>.sav` next to the ROM (or to `SaveDirectory` in settings). It writes the file about a second
+after the game saves, and again on exit. The save chip type (EEPROM/FLASH/FRAM) is detected automatically the first time the
+game saves. An existing `.sav` file determines the type from its size, so saves from other emulators that use raw dumps work.
+
+## Settings file
+
+`%APPDATA%\Px86.NintendoDS\settings.json` (Windows) or `~/.config/Px86.NintendoDS/settings.json` (Linux/macOS):
+
+```json
+{
+  "Bios9Path": null, "Bios7Path": null, "FirmwarePath": null, "UseRealBios": false,
+  "Scale": 2, "AudioEnabled": true, "SaveDirectory": null,
+  "KeyBindings": { "Up": "Up", "X": "A", "Z": "B", "...": "..." }
+}
+```
+
+## Command line
+
+Run with `--help` to see every option. For debugging, `--headless --frames N --screenshot out.png` runs without a window
+and writes both screens to a PNG. `--trace-io` logs I/O registers the emulator doesn't handle yet.
