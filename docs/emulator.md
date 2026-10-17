@@ -22,7 +22,7 @@ The menu bar sits at the top of the window. Esc hides it, for example in fullscr
 | File | Open ROM, Recent, Close ROM, Save/Load state (slots 0–9 with times, or any file), Screenshot, GX capture, Exit |
 | Emulation | Pause/Resume, Frame advance, Reset, Speed (normal, turbo, slow motion, unlimited) |
 | Config | Settings…, screen layout, swap screens, smooth filtering, fullscreen |
-| Tools | Cheats (Ctrl+C), Cheat search, Debugger (Ctrl+D), Memory (Ctrl+M), I/O registers, Video viewers, PINE socket and GS frame stream on/off (for CodeDesigner) |
+| Tools | Cheats (Ctrl+C), Cheat search, Debugger (Ctrl+D), Memory (Ctrl+M), I/O registers, Video viewers, Log (Ctrl+L), Strings (Ctrl+T), PINE socket and GS frame stream on/off (for CodeDesigner) |
 | Help | Controls, About |
 
 **Config → Settings** (Ctrl+,) has these tabs. Settings are saved when the window closes.
@@ -137,6 +137,14 @@ These are the same tools the PINE socket exposes, so CodeDesigner and the built-
   - When a breakpoint or watchpoint hits, the game pauses and the debugger opens at that instruction.
 - **Memory** (Ctrl+M): a hex editor over either CPU's address space, with quick jumps to each region. Click a byte
   to type a new value. *Break on write/read* makes a watchpoint from the selection.
+- **Strings** (Ctrl+T): a string dumper.
+  - **Scan** lists the ASCII text in the chosen CPU's RAM: main RAM, shared WRAM, and ITCM/DTCM/LCDC VRAM (ARM9) or
+    ARM7 WRAM, or one of those regions.
+  - **What counts as a string:** printable runs of at least *Min length* characters, like the `strings` tool.
+    Line breaks inside a string show as `\n`.
+  - Click a string to open the Memory window at its address, with its bytes highlighted.
+  - Filter the list, and copy it as `address  text` lines.
+  - The list is a snapshot: press Scan again after the game has moved on.
 - **I/O registers**: the main display, VRAM, interrupt, DMA, timer, IPC, cartridge, 3D and sound registers of
   both CPUs, live, with key fields decoded.
 - **Video viewers**:
