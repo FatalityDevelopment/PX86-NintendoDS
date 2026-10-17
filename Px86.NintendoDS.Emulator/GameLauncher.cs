@@ -48,6 +48,7 @@ namespace Px86.NintendoDS.Emulator
             var session = Start(OptionsFor(romPath, savePath));
             if (session == null)
                 return false;
+            session.Emulator.CpuMode = _settings.CpuMode;
             _host.Attach(session);
             _settings.AddRecentRom(romPath);
             TrySaveSettings();

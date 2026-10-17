@@ -7,6 +7,7 @@ using Px86.NintendoDS.EmulatorCore.Cartridge;
 using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
+using Px86.NintendoDS.EmulatorCore.Jit;
 using Px86.NintendoDS.EmulatorCore.Video;
 using Px86.NintendoDS.EmulatorCore.Video.Gpu3D;
 using Px86.NintendoDS.FileFormats.Rom;
@@ -66,6 +67,11 @@ namespace Px86.NintendoDS.EmulatorCore
             Arm9.Cp15 = Cp15;
             Cp15.TcmConfigurationChanged += Arm9Bus.UpdateTcm;
 
+            Code = new CodeTracker(MainRam, SharedWram, Arm7Wram, Arm9Bus.Itcm);
+            _blocks9 = new BlockCache(Arm9, Code, Arm9Bus.LocateCode);
+            _blocks7 = new BlockCache(Arm7, Code, Arm7Bus.LocateCode);
+            Cp15.TcmConfigurationChanged += FlushCode;
+
             Irq9 = new InterruptController(Arm9, isArm9: true);
             Irq7 = new InterruptController(Arm7, isArm9: false);
             Timers9 = new TimerUnit(Scheduler, Irq9, isArm9: true);
@@ -92,6 +98,7 @@ namespace Px86.NintendoDS.EmulatorCore
             Hle7 = new HleBios(this, isArm9: false);
 
             Control.ExMemChanged += () => Cartridge.Owner = Control.NdsSlotOwner;
+            Control.WramMappingChanged += FlushCode;
             Dma9.Started += timing =>
             {
                 if (timing == DmaTiming.Cartridge) Cartridge.OnDmaStarted(0);
@@ -108,6 +115,26 @@ namespace Px86.NintendoDS.EmulatorCore
         // ── Components ────────────────────────────────────────────────────────
 
         public Scheduler Scheduler { get; }
+
+        /// <summary>Which RAM pages hold cached code (written by the buses).</summary>
+        public CodeTracker Code { get; }
+
+        private readonly BlockCache _blocks9;
+        private readonly BlockCache _blocks7;
+
+        /// <summary>Interpreter or cached blocks. Breakpoints and watchpoints always use the interpreter.</summary>
+        public CpuMode CpuMode { get; set; } = CpuMode.Interpreter;
+
+        /// <summary>Drop every cached block (memory was remapped, reset, state loaded).</summary>
+        public void FlushCode()
+        {
+            Code.Clear();
+            _blocks9.Clear();
+            _blocks7.Clear();
+        }
+
+        /// <summary>Number of blocks built so far (both CPUs), for diagnostics.</summary>
+        public long BlocksCompiled => _blocks9.Compiles + _blocks7.Compiles;
         public ArmCpu Arm9 { get; }
         public ArmCpu Arm7 { get; }
         public Cp15 Cp15 { get; }
@@ -191,6 +218,7 @@ namespace Px86.NintendoDS.EmulatorCore
 
         public void Reset()
         {
+            FlushCode();
             Scheduler.Reset();
             Array.Clear(MainRam);
             Array.Clear(SharedWram);
@@ -266,7 +294,18 @@ namespace Px86.NintendoDS.EmulatorCore
         /// game or version; the emulator is unchanged in that case only if the
         /// header check fails (later failures leave it partially loaded).
         /// </summary>
-        public void LoadState(Stream stream) => SerializeState(StateSerializer.ForReading(stream));
+        public void LoadState(Stream stream)
+        {
+            FlushCode();
+            try
+            {
+                SerializeState(StateSerializer.ForReading(stream));
+            }
+            finally
+            {
+                FlushCode(); // memory and mappings were replaced wholesale
+            }
+        }
 
         private void SerializeState(StateSerializer s)
         {
@@ -451,6 +490,8 @@ namespace Px86.NintendoDS.EmulatorCore
                 target = Scheduler.Now + 1;
             var debug = _debugger;
 
+            bool cached = CpuMode == CpuMode.Cached && debug == null;
+
             // ARM9
             WakeIfPending(Arm9, Irq9);
             while (_arm9Time < target)
@@ -459,6 +500,11 @@ namespace Px86.NintendoDS.EmulatorCore
                 {
                     _arm9Time = target;
                     break;
+                }
+                if (cached && !Arm9.IrqPending && _blocks9.Get() is { } block9)
+                {
+                    _arm9Time = RunBlock(Arm9, block9, _arm9Time, target, Dma9, 1);
+                    continue;
                 }
                 if (debug != null && debug.CheckBreakpoint(0, Arm9.Pc))
                     return false;
@@ -482,6 +528,11 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm7Time = target;
                     break;
                 }
+                if (cached && !Arm7.IrqPending && _blocks7.Get() is { } block7)
+                {
+                    _arm7Time = RunBlock(Arm7, block7, _arm7Time, target, Dma7, 2);
+                    continue;
+                }
                 if (debug != null && debug.CheckBreakpoint(1, Arm7.Pc))
                     return false;
                 Scheduler.CurrentTime = _arm7Time;
@@ -497,6 +548,36 @@ namespace Px86.NintendoDS.EmulatorCore
 
             Scheduler.AdvanceTo(target);
             return true;
+        }
+
+        /// <summary>
+        /// Run a cached block: the same per-instruction work as the
+        /// interpreter loop above (device time, DMA stalls, IRQ/halt checks),
+        /// stopping at the slice end, a jump, a halt, a pending IRQ, or when
+        /// the block's code was overwritten.
+        /// </summary>
+        private long RunBlock(ArmCpu cpu, CachedBlock block, long time, long target, DmaController dma, int clock)
+        {
+            uint expected = block.Address;
+            uint size = block.Thumb ? 2u : 4u;
+            var opcodes = block.Opcodes;
+            for (int i = 0; i < block.Count; i++)
+            {
+                Scheduler.CurrentTime = time;
+                int cycles = block.Thumb
+                    ? cpu.ExecuteDecodedThumb(opcodes[i], block.ThumbHandlers![i])
+                    : cpu.ExecuteDecodedArm(opcodes[i], block.ArmHandlers![i]);
+                time += cycles * clock;
+                if (dma.PendingCycles != 0)
+                {
+                    time += dma.PendingCycles * clock;
+                    dma.PendingCycles = 0;
+                }
+                expected += size;
+                if (time >= target || cpu.Pc != expected || cpu.Halted || cpu.IrqPending || !block.Valid || cpu.IsThumb != block.Thumb)
+                    break;
+            }
+            return time;
         }
 
         /// <summary>HALT ends as soon as (IE &amp; IF) != 0, even if the IRQ was already pending when the CPU halted.</summary>

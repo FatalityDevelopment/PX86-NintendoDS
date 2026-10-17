@@ -259,6 +259,47 @@ namespace Px86.NintendoDS.Common.Cpu
             return _cycles;
         }
 
+        /// <summary>
+        /// Execute one pre-decoded ARM instruction at the current PC: exactly
+        /// what <see cref="Step"/> does after its IRQ/halt checks, minus the
+        /// fetch and decode. The caller (a block cache) guarantees that
+        /// <paramref name="op"/> is the opcode at <see cref="Pc"/> and that no
+        /// IRQ is pending and the core isn't halted.
+        /// </summary>
+        public int ExecuteDecodedArm(uint op, Arm.ArmHandler handler)
+        {
+            _cycles = 1;
+            uint pc = _pc;
+            R[15] = pc + 8;
+            uint cond = op >> 28;
+            if (cond == 0xE || ConditionPassed(cond))
+                handler(this, op);
+            else if (cond == 0xF)
+                ArmInstructionTable.ExecuteUnconditional(this, op);
+            if (!Branched)
+                _pc = pc + 4;
+            Branched = false;
+            TotalCycles += _cycles;
+            return _cycles;
+        }
+
+        /// <summary>Thumb counterpart of <see cref="ExecuteDecodedArm"/>.</summary>
+        public int ExecuteDecodedThumb(uint op, Thumb.ThumbHandler handler)
+        {
+            _cycles = 1;
+            uint pc = _pc;
+            R[15] = pc + 4;
+            handler(this, op);
+            if (!Branched)
+                _pc = pc + 2;
+            Branched = false;
+            TotalCycles += _cycles;
+            return _cycles;
+        }
+
+        /// <summary>True when the next <see cref="Step"/> would take an IRQ.</summary>
+        public bool IrqPending => IrqLine && (_cpsr & FLAG_I) == 0;
+
         /// <summary>Run until at least <paramref name="cycles"/> cycles have elapsed. Returns the cycles actually run.</summary>
         public int Run(int cycles)
         {

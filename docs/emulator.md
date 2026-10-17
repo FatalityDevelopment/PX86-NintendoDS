@@ -34,7 +34,7 @@ The menu bar sits at the top of the window. Esc hides it, for example in fullscr
 | Audio | Sound on/off, volume |
 | Input | Rebind each DS button by clicking it and pressing a key |
 | Firmware user | Nickname, message, birthday, language, favourite colour (used when no firmware dump is set) |
-| Emulation | Turbo speed |
+| Emulation | Turbo speed, CPU mode (Interpreter or Cached; identical results, the debugger always interprets) |
 | Remote | PINE and GS stream sockets: on/off, ports, format, JPEG quality |
 
 Use your own legally made dumps of your cartridges. Nothing copyrighted ships with the emulator.

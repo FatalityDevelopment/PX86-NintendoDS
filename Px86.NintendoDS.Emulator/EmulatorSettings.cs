@@ -1,3 +1,4 @@
+using Px86.NintendoDS.EmulatorCore.Jit;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -58,6 +59,9 @@ namespace Px86.NintendoDS.Emulator
 
         /// <summary>Speed of the "turbo" limiter mode, in percent.</summary>
         public int TurboPercent { get; set; } = 200;
+
+        /// <summary>How the CPUs run code (interpreter or decoded-block cache). The debugger always interprets.</summary>
+        public CpuMode CpuMode { get; set; } = CpuMode.Interpreter;
 
         /// <summary>Most recently opened ROMs, newest first.</summary>
         public List<string> RecentRoms { get; set; } = new();

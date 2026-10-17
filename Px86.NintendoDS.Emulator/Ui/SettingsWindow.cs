@@ -1,3 +1,4 @@
+using Px86.NintendoDS.EmulatorCore.Jit;
 using System.Numerics;
 using ImGuiNET;
 using Px86.NintendoDS.EmulatorCore.Hardware;
@@ -260,7 +261,18 @@ namespace Px86.NintendoDS.Emulator.Ui
                 _ui.Host.TurboSpeed = turbo / 100.0;
             }
             ImGui.TextDisabled("Emulation > Speed > Turbo uses this; hold Tab for unlimited speed.");
+
+            ImGui.Spacing();
+            int mode = (int)s.CpuMode;
+            if (ImGui.Combo("CPU", ref mode, CpuModes, CpuModes.Length))
+            {
+                s.CpuMode = (CpuMode)mode;
+                _ui.Host.Invoke(() => { if (_ui.Host.Emulator is { } nds) nds.CpuMode = s.CpuMode; });
+            }
+            ImGui.TextDisabled("Cached decodes runs of code once. Results are identical; the debugger always interprets.");
         }
+
+        private static readonly string[] CpuModes = { "Interpreter", "Cached" };
 
         private void RemoteTab()
         {
