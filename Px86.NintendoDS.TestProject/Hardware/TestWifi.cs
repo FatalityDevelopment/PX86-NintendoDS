@@ -100,6 +100,10 @@ namespace Px86.NintendoDS.TestProject.Hardware
             using (a)
             using (b)
             {
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                while ((a.KnownPeers == 0 || b.KnownPeers == 0) && DateTime.UtcNow < deadline)
+                    Thread.Sleep(5);
+                Assert.IsTrue(a.KnownPeers == 1 && b.KnownPeers == 1, "the two media found each other");
                 var master = Boot(1, a);
                 var slave = Boot(2, b);
                 RunMultiplay(master, slave);

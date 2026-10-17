@@ -20,6 +20,11 @@ namespace Px86.NintendoDS.EmulatorCore.Network
     ///   8  8  sender id (a random console id; own frames are dropped)
     ///   16 …  IEEE 802.11 frame without FCS
     ///
+    /// A datagram with no frame is a presence announcement. Every member sends
+    /// one when it joins and every second, and answers a newcomer's at once,
+    /// so a multiplay master knows its slaves (and waits for their replies)
+    /// before they have sent any frame.
+    ///
     /// There is no clock sync between the consoles: frames are delivered as they
     /// arrive, and a multiplay master waits (in real time) for its slaves'
     /// replies. Games that are very strict about multiplay timing may drop the
@@ -36,9 +41,12 @@ namespace Px86.NintendoDS.EmulatorCore.Network
         private readonly UdpClient _socket;
         private readonly IPEndPoint _group;
         private readonly BlockingCollection<WifiPacket> _received = new(new ConcurrentQueue<WifiPacket>(), 4096);
-        private readonly ConcurrentDictionary<long, DateTime> _peers = new();
+        private readonly ConcurrentDictionary<long, DateTime> _peers = new();   // console ids, from frames
+        private readonly ConcurrentDictionary<long, DateTime> _members = new(); // other media, from announcements
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _receiver;
+        private readonly long _id = Random.Shared.NextInt64();
+        private readonly Timer _presence;
 
         /// <param name="lan">Also reach consoles on other machines in the local network (multicast TTL 1).</param>
         public LocalWifiMedium(int port = DefaultPort, bool lan = false, IPAddress? group = null)
@@ -55,6 +63,7 @@ namespace Px86.NintendoDS.EmulatorCore.Network
             _socket.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, lan ? 1 : 0);
             Port = port;
             _receiver = Task.Run(ReceiveLoop);
+            _presence = new Timer(_ => Announce(), null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
         }
 
         public int Port { get; }
@@ -71,10 +80,27 @@ namespace Px86.NintendoDS.EmulatorCore.Network
             datagram[6] = (byte)packet.ReplyAid;
             BinaryPrimitives.WriteInt64LittleEndian(datagram.AsSpan(8), packet.Sender);
             packet.Frame.CopyTo(datagram, HeaderSize);
+            SendDatagram(datagram);
+            DatagramsSent++;
+        }
+
+        /// <summary>Other members of the group heard from in the last 5 s.</summary>
+        public int KnownPeers => PeerCount(_id);
+
+        private void Announce()
+        {
+            var datagram = new byte[HeaderSize];
+            Magic.CopyTo(datagram, 0);
+            datagram[4] = 1;
+            BinaryPrimitives.WriteInt64LittleEndian(datagram.AsSpan(8), _id);
+            SendDatagram(datagram);
+        }
+
+        private void SendDatagram(byte[] datagram)
+        {
             try
             {
                 _socket.Send(datagram, datagram.Length, _group);
-                DatagramsSent++;
             }
             catch (SocketException)
             {
@@ -100,7 +126,7 @@ namespace Px86.NintendoDS.EmulatorCore.Network
         public int PeerCount(long self)
         {
             var cutoff = DateTime.UtcNow - TimeSpan.FromSeconds(5);
-            return _peers.Count(p => p.Key != self && p.Value > cutoff);
+            return Math.Max(_peers.Count(p => p.Key != self && p.Value > cutoff), _members.Count(p => p.Value > cutoff));
         }
 
         private async Task ReceiveLoop()
@@ -122,9 +148,21 @@ namespace Px86.NintendoDS.EmulatorCore.Network
                 }
 
                 var data = result.Buffer;
-                if (data.Length < HeaderSize + 10 || !data.AsSpan(0, 4).SequenceEqual(Magic) || data[4] != 1)
+                if (data.Length < HeaderSize || !data.AsSpan(0, 4).SequenceEqual(Magic) || data[4] != 1)
                     continue;
                 long sender = BinaryPrimitives.ReadInt64LittleEndian(data.AsSpan(8));
+                if (data.Length == HeaderSize)
+                {
+                    if (sender == _id)
+                        continue;
+                    bool known = _members.TryGetValue(sender, out var seen) && seen > DateTime.UtcNow - TimeSpan.FromSeconds(5);
+                    _members[sender] = DateTime.UtcNow;
+                    if (!known)
+                        Announce();
+                    continue;
+                }
+                if (data.Length < HeaderSize + 10)
+                    continue;
                 _peers[sender] = DateTime.UtcNow;
                 DatagramsReceived++;
                 _received.TryAdd(new WifiPacket
@@ -140,6 +178,7 @@ namespace Px86.NintendoDS.EmulatorCore.Network
         public void Dispose()
         {
             _stop.Cancel();
+            _presence.Dispose();
             _socket.Dispose();
             try { _receiver.Wait(TimeSpan.FromSeconds(1)); } catch (AggregateException) { }
             _stop.Dispose();
