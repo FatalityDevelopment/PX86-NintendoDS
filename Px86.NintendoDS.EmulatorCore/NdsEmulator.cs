@@ -86,6 +86,9 @@ namespace Px86.NintendoDS.EmulatorCore
             Control = new SystemControl();
             Spi = new SpiBus(Irq7, new PowerManager(), FirmwareFlash.CreateDefault(), new TouchScreen());
             Wifi = new WifiController(Scheduler, Irq7);
+            DebugOutput = new DebugOutput(this);
+            Arm9.NoCashMessage = DebugOutput.OnNoCashMessage;
+            Arm7.NoCashMessage = DebugOutput.OnNoCashMessage;
             Spi.Touch.Clock = () => Scheduler.CurrentTime;
             Spi.Touch.Amplifier = () => (Spi.Power.MicrophoneAmplifierOn, Spi.Power.MicrophoneGain);
             Cartridge = new CartridgeSlot(Scheduler, Irq9, Irq7, Dma9, Dma7);
@@ -172,6 +175,9 @@ namespace Px86.NintendoDS.EmulatorCore
 
         /// <summary>The ARM7's Wifi hardware; set <see cref="WifiController.Medium"/> to connect it.</summary>
         public WifiController Wifi { get; }
+
+        /// <summary>Text the game prints through the emulator debug ports and messages.</summary>
+        public DebugOutput DebugOutput { get; }
         public CartridgeSlot Cartridge { get; }
         public LcdController Lcd { get; }
         public Gpu2DEngine EngineA { get; }
@@ -258,6 +264,7 @@ namespace Px86.NintendoDS.EmulatorCore
             // The firmware's RF type tells which console it came from: 2 = DS (MM3155 + RF9008), 3 = DS-Lite.
             Wifi.ChipId = Spi.Firmware.Data[0x40] == 2 ? (ushort)0x1440 : (ushort)0xC340;
             Wifi.Reset();
+            DebugOutput.Reset();
             Cartridge.Reset();
             EngineA.Reset();
             EngineB.Reset();
@@ -365,6 +372,7 @@ namespace Px86.NintendoDS.EmulatorCore
             Control.Serialize(s);
             Spi.Serialize(s);
             Wifi.Serialize(s);
+            DebugOutput.Serialize(s);
             Cartridge.Serialize(s);
             Lcd.Serialize(s);
             EngineA.Serialize(s);

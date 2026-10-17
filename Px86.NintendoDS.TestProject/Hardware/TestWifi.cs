@@ -100,6 +100,10 @@ namespace Px86.NintendoDS.TestProject.Hardware
             using (a)
             using (b)
             {
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                while ((a.KnownPeers == 0 || b.KnownPeers == 0) && DateTime.UtcNow < deadline)
+                    Thread.Sleep(5);
+                Assert.IsTrue(a.KnownPeers == 1 && b.KnownPeers == 1, "the two media found each other");
                 var master = Boot(1, a);
                 var slave = Boot(2, b);
                 RunMultiplay(master, slave);
@@ -112,6 +116,9 @@ namespace Px86.NintendoDS.TestProject.Hardware
         {
             // Dedicated threads released together: a late-starting slave (thread pool starvation
             // under parallel tests) would leave the master sending CMDs to nobody.
+            // The master stops waiting as soon as the reply arrives, so a long timeout only costs
+            // time when the slave's thread is starved (busy CI runners).
+            master.Wifi.ReplyTimeout = TimeSpan.FromSeconds(2);
             using var start = new Barrier(2);
             var threads = new[] { master, slave }.Select(nds => new Thread(() =>
             {
@@ -242,12 +249,17 @@ namespace Px86.NintendoDS.TestProject.Hardware
         }
 
         [TestMethod]
+        [DoNotParallelize] // the access point's beacon timer runs in real time
         public void AccessPointBeaconsReachTheConsole()
         {
             using var online = new OnlineWifiMedium(NullWifiMedium.Instance, null);
             var nds = Boot(0, online);
-            RunUntilDone(nds, 120);
-            for (int i = 0; i < 20; i++) nds.RunFrame(); // 20 frames ≈ 330 ms: a few 100 ms beacons
+            // Beacons come every 100 ms of wall-clock time, and the ROM waits for one: a fast or
+            // loaded machine can run any fixed number of frames before the first arrives.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+            while ((R7(nds, 0) != TestRomRunner.DoneMagic || R7(nds, 13) == 0) && DateTime.UtcNow < deadline)
+                nds.RunFrame();
+            Assert.AreEqual(TestRomRunner.DoneMagic, R7(nds, 0), $"ARM7 did not finish: {nds.Arm7}");
             Assert.IsTrue(R7(nds, 13) > 0, "the console's receiver saw the access point's beacons");
         }
 

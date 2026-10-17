@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.Common.Interfaces;
 using Px86.NintendoDS.EmulatorCore.Cartridge;
+using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
 using Px86.NintendoDS.EmulatorCore.Video;
@@ -424,6 +425,8 @@ namespace Px86.NintendoDS.EmulatorCore
         public uint ReadIo32(uint address)
         {
             uint offset = Offset(address);
+            if (DebugOutput.IsPort(offset))
+                return _nds.DebugOutput.Read(DebugCpu.Arm9, offset, 4);
             if (TryReadIo32(offset, out uint value))
                 return value;
             return ReadIo16Core(offset) | ((uint)ReadIo16Core(offset + 2) << 16);
@@ -432,6 +435,8 @@ namespace Px86.NintendoDS.EmulatorCore
         public ushort ReadIo16(uint address)
         {
             uint offset = Offset(address);
+            if (DebugOutput.IsPort(offset))
+                return (ushort)_nds.DebugOutput.Read(DebugCpu.Arm9, offset, 2);
             if (TryReadIo32(offset & ~3u, out uint value))
                 return (ushort)(value >> (int)((offset & 2) * 8));
             return ReadIo16Core(offset);
@@ -440,6 +445,8 @@ namespace Px86.NintendoDS.EmulatorCore
         public byte ReadIo8(uint address)
         {
             uint offset = Offset(address);
+            if (DebugOutput.IsPort(offset))
+                return (byte)_nds.DebugOutput.Read(DebugCpu.Arm9, offset, 1);
             if (offset >= 0x240 && offset <= 0x249)
                 return offset == 0x247 ? _nds.Control.WramMode : _nds.Vram.ReadControl(VramBankForOffset(offset));
             return (byte)(ReadIo16(address & ~1u) >> (int)((address & 1) * 8));
@@ -544,6 +551,11 @@ namespace Px86.NintendoDS.EmulatorCore
         public void WriteIo32(uint address, uint value)
         {
             uint offset = Offset(address);
+            if (DebugOutput.IsPort(offset))
+            {
+                _nds.DebugOutput.Write(DebugCpu.Arm9, offset, value, 4);
+                return;
+            }
             if (TryWriteIo32(offset, value, 0xFFFFFFFFu))
                 return;
             WriteIo16Core(offset, (ushort)value, 0xFFFF);
@@ -553,6 +565,11 @@ namespace Px86.NintendoDS.EmulatorCore
         public void WriteIo16(uint address, ushort value, ushort mask)
         {
             uint offset = Offset(address);
+            if (DebugOutput.IsPort(offset))
+            {
+                _nds.DebugOutput.Write(DebugCpu.Arm9, offset, value, 2);
+                return;
+            }
             int shift = (int)(offset & 2) * 8;
             if (TryWriteIo32(offset & ~3u, (uint)value << shift, (uint)mask << shift))
                 return;
@@ -562,6 +579,11 @@ namespace Px86.NintendoDS.EmulatorCore
         public void WriteIo8(uint address, byte value)
         {
             uint offset = Offset(address);
+            if (DebugOutput.IsPort(offset))
+            {
+                _nds.DebugOutput.Write(DebugCpu.Arm9, offset, value, 1);
+                return;
+            }
             if (offset >= 0x240 && offset <= 0x249)
             {
                 if (offset == 0x247)

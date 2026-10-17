@@ -126,6 +126,8 @@ namespace Px86.NintendoDS.Common.Cpu.Thumb
                     Alu.Subtract(cpu, cpu.R[rd], value, true);
                     break;
                 case 2:
+                    if (op == 0x46E4)
+                        cpu.NoCashMessage?.Invoke(cpu); // mov r12,r12: debug message marker
                     if (rd == 15) cpu.Branch(value);
                     else cpu.R[rd] = value;
                     break;

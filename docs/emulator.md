@@ -155,6 +155,25 @@ whoever fixes the bug.
 `Px86.NintendoDS.Emulator --replay-gx file.gxcap` re-renders it without the game. It writes
 `file.png` and `file.txt`, a dump of every polygon and command.
 
+## Game debug output (Log window)
+
+**Tools → Log** (Ctrl+L) shows what programs print through the emulator debug channels that homebrew, debug
+builds and test programs use. It works on both CPUs:
+
+| Channel | How to print |
+|---|---|
+| no$gba string port | `*(volatile u32*)0x04FFFA10 = (u32)"text";`. Use 04FFFA14h to expand `%r0%`-style fields, and 04FFFA18h to also end the line. |
+| no$gba char port | write bytes to 04FFFA1Ch; `\n` ends the line |
+| Ensata char port | write bytes to 04FFF000h (ARM9) |
+| In-code message | `mov r12,r12`, then `b 1f`, then `.hword 0x6464, 0`, then `.ascii "text"` and `.byte 0`, then the `1:` label |
+
+- **`%param%` fields:** `%r0%`–`%r15%`, `%sp%`, `%lr%`, `%pc%` (hex), `%scanline%`, `%frame%`, `%totalclks%`,
+  `%lastclks%` and `%zeroclks%`.
+- **ID and cycle counter:** 04FFFA00h reads "no$gba Px86" (libraries check the "no$gba" prefix), and
+  04FFFA20h reads the CPU's cycle counter.
+- **Using the window:** filter by CPU or text, pause the view, copy everything to the clipboard, or clear it.
+- **Retail games:** commercial games normally strip their printf output, so they usually show nothing here.
+
 ## Microphone
 
 Games that listen (blowing out candles, shouting) hear the PC's microphone, recorded at 16 kHz through

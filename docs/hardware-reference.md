@@ -55,6 +55,21 @@ WRAMCNT (ARM9 04000247h): 0 = 32K to ARM9, 1 = 2nd half ARM9 / 1st half ARM7, 2 
 | 04000300h | POSTFLG / HALTCNT | 9/7 | HALTCNT is ARM7 only |
 | 04000400h | Sound channels | 7 | 16 bytes × 16 |
 
+## Debug ports (emulator, both CPUs)
+
+no$gba pseudo-I/O (`EmulatorCore/Debugging/DebugOutput.cs`):
+
+| Address | Access | Meaning |
+|---|---|---|
+| 04FFFA00h | R | emulator ID |
+| 04FFFA10h, 14h, 18h | W | string pointer: raw / `%param%` / `%param%` + line feed |
+| 04FFFA1Ch | W | char out |
+| 04FFFA20h | R | 64-bit cycle counter |
+| 04FFF000h | W, ARM9 | Ensata char out |
+
+`mov r12,r12` followed by a branch over `6464h, flags, text` is an in-code message. GBATEK: "DS Debug Registers
+(Emulator/Devkits)", "Debug Messages".
+
 ## Microphone (ARM7)
 
 The microphone is the TSC2046's AUX input (channel 6, single-ended: command E4h for 12-bit, ECh for 8-bit).
