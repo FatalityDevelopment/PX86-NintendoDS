@@ -75,7 +75,8 @@ namespace Px86.NintendoDS.EmulatorCore
             Gpu3D = new Gpu3DEngine(Vram, Irq9, Dma9);
             EngineA.ThreeDLineProvider = Gpu3D.GetLine;
             EngineA.Alpha3DProvider = Gpu3D.GetAlpha;
-            Sound = new SoundUnit();
+            Sound = new SoundUnit(Scheduler, Arm7Bus);
+            Sound.Powered = () => Control.SoundEnabled;
 
             Hle9 = new HleBios(this, isArm9: true);
             Hle7 = new HleBios(this, isArm9: false);

@@ -351,10 +351,7 @@ namespace Px86.NintendoDS.EmulatorCore
             }
             if (SoundUnit.Contains(offset))
             {
-                if (mask == 0xFFFFFFFFu)
-                    _nds.Sound.Write32(offset, value);
-                else
-                    _nds.Sound.Write32(offset, (_nds.Sound.Read32(offset) & ~mask) | (value & mask));
+                _nds.Sound.Write32(offset, value, mask);
                 return true;
             }
             return false;

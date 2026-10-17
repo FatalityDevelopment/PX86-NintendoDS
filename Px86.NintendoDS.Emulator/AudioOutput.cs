@@ -11,6 +11,7 @@ namespace Px86.NintendoDS.Emulator
     public sealed unsafe class AudioOutput : IDisposable
     {
         private const int BufferCount = 6;
+        private const int MaxBacklogFrames = 2048;
 
         private readonly AL _al;
         private readonly ALContext _alc;
@@ -66,14 +67,20 @@ namespace Px86.NintendoDS.Emulator
                     _freeBuffers.Enqueue(b);
             }
 
-            int frames = _nds.Sound.ReadSamples(_samples);
-            if (frames == 0 || _freeBuffers.Count == 0)
-                return;
+            while (_freeBuffers.Count > 0)
+            {
+                int frames = _nds.Sound.ReadSamples(_samples);
+                if (frames == 0)
+                    break;
+                uint buffer = _freeBuffers.Dequeue();
+                fixed (short* data = _samples)
+                    _al.BufferData(buffer, BufferFormat.Stereo16, data, frames * 4, _nds.Sound.SampleRate);
+                _al.SourceQueueBuffers(_source, 1, &buffer);
+            }
 
-            uint buffer = _freeBuffers.Dequeue();
-            fixed (short* data = _samples)
-                _al.BufferData(buffer, BufferFormat.Stereo16, data, frames * 4, _nds.Sound.SampleRate);
-            _al.SourceQueueBuffers(_source, 1, &buffer);
+            // Keep latency bounded: if OpenAL is behind (all buffers queued), drop the excess.
+            while (_nds.Sound.BufferedFrames > MaxBacklogFrames)
+                _nds.Sound.ReadSamples(_samples);
 
             _al.GetSourceProperty(_source, GetSourceInteger.SourceState, out int state);
             if ((SourceState)state != SourceState.Playing)
