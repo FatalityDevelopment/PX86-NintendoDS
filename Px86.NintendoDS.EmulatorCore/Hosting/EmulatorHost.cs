@@ -214,6 +214,22 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
             _wake.Set();
         }
 
+        /// <summary>Stop and close the current game (its save is written).</summary>
+        public void Unload()
+        {
+            Invoke(() =>
+            {
+                if (Session == null)
+                    return;
+                Session.Emulator.FrameCompleted -= OnEmulatorFrame;
+                Session.Emulator.Debugger = null;
+                Session.Dispose();
+                Session = null;
+                Debugger.PendingBreak = null;
+                _framesToAdvance = 0;
+            });
+        }
+
         /// <summary>Restart the current game from boot (the save file is kept).</summary>
         public bool Reset()
         {

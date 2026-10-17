@@ -8,8 +8,34 @@
 dotnet run --project Px86.NintendoDS.Emulator -c Release -- "path/to/My Game.nds"
 ```
 
-You can also publish a self-contained build (`dotnet publish Px86.NintendoDS.Emulator -c Release -r win-x64 --self-contained`)
-and drag a `.nds` file onto `Px86.NintendoDS.Emulator.exe`.
+You can also start it without a ROM and use **File → Open ROM** (Ctrl+O), pick one from
+**File → Recent**, or drag a `.nds` file onto the window. A self-contained build
+(`dotnet publish Px86.NintendoDS.Emulator -c Release -r win-x64 --self-contained`) works the same way, and you can drop
+a `.nds` file onto `Px86.NintendoDS.Emulator.exe`.
+
+## Menus and settings
+
+The menu bar sits at the top of the window. Esc hides it, for example in fullscreen, and shows it again.
+
+| Menu | What's there |
+|---|---|
+| File | Open ROM, Recent, Close ROM, Save/Load state (slots 0–9 with times, or any file), Screenshot, GX capture, Exit |
+| Emulation | Pause/Resume, Frame advance, Reset, Speed (normal, turbo, slow motion, unlimited) |
+| Config | Settings…, screen layout, swap screens, smooth filtering, fullscreen |
+| Tools | PINE socket and GS frame stream on/off (for CodeDesigner) |
+| Help | Controls, About |
+
+**Config → Settings** (Ctrl+,) has these tabs. Settings are saved when the window closes.
+
+| Tab | Settings |
+|---|---|
+| Paths & boot | BIOS/firmware dumps (Browse…), direct boot or boot through the real BIOS, save folder |
+| Video | Layout (vertical, horizontal, single screen), rotation, gap between the screens, swap, integer scaling, smooth filtering, window scale |
+| Audio | Sound on/off, volume |
+| Input | Rebind each DS button by clicking it and pressing a key |
+| Firmware user | Nickname, message, birthday, language, favourite colour (used when no firmware dump is set) |
+| Emulation | Turbo speed |
+| Remote | PINE and GS stream sockets: on/off, ports, format, JPEG quality |
 
 Use your own legally made dumps of your cartridges. Nothing copyrighted ships with the emulator.
 
@@ -36,20 +62,25 @@ With a firmware dump, your nickname, language and touch-screen calibration come 
 | Start / Select | Enter / Backspace | Start / Back |
 | Touch screen | Left mouse button on the bottom screen | — |
 | Fast-forward | Hold Tab | Right trigger |
-| Pause | P | — |
+| Pause / frame advance | P / N | — |
+| Reset | Ctrl+R | — |
 | Save state / load state | F5 / F8 | — |
 | Previous / next state slot | F6 / F7 (slots 0–9, shown in the title bar) | — |
 | Fullscreen | F11 | — |
 | Screenshot | F12 (saved to Pictures/Px86.NintendoDS) | — |
 | GX capture (3D bug report) | F9 (saved to Pictures/Px86.NintendoDS as `.gxcap`) | — |
-| Quit | Esc | — |
+| Open ROM | Ctrl+O (or drop a file on the window) | — |
+| Settings | Ctrl+, | — |
+| Hide / show the menu bar | Esc | — |
+| Quit | Ctrl+Q | — |
 
 Save states are written next to the ROM as `game.st0` … `game.st9`. A state is the whole
 machine, including the cartridge save memory at that moment, so loading an old state also rolls
 the in-game save back; the `.sav` file is only rewritten the next time the game saves. States are
 tied to the game (its game code) and to this emulator's state format version.
 
-Keyboard bindings can be changed in `settings.json` (`KeyBindings` maps a Silk.NET key name to a DS button).
+Keyboard bindings can be changed in **Config → Settings → Input**, or in `settings.json`, where `KeyBindings` maps a Silk.NET
+key name to a DS button. P and N act as hotkeys only while no DS button is bound to them.
 
 ## Saves
 

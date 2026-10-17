@@ -45,7 +45,9 @@ Px86.NintendoDS.sln
 │   ├── Video/                       # LCD timing, VRAM banks, 2D engines, Gpu3D/
 │   └── Audio/                       # SPU
 ├── Px86.NintendoDS.Emulator/        # Silk.NET frontend (SDL window, OpenGL, OpenAL, input, headless mode)
-├── Px86.NintendoDS.TestProject/     # MSTest suite: Cpu/, Emulator/, Video/, TestRoms/
+│   ├── Ui/                          # Dear ImGui menu bar, settings, file browser, notifications (ASCII text only)
+│   └── ScreenLayout.cs              # Screen placement + mouse→touch mapping (pure, unit-tested)
+├── Px86.NintendoDS.TestProject/     # MSTest suite: Cpu/, Emulator/, Video/, Remote/, Debugging/, Frontend/, TestRoms/
 ├── tools/testroms/                  # clang-based test ROM toolchain (C sources → TestRoms/*.nds)
 └── docs/                            # Architecture, hardware reference, learning resources, roadmap
 ```

@@ -52,6 +52,9 @@ namespace Px86.NintendoDS.Emulator
             }
         }
 
+        /// <summary>Output volume, 0–1.</summary>
+        public void SetVolume(float volume) => _al.SetSourceProperty(_source, SourceFloat.Gain, Math.Clamp(volume, 0f, 1f));
+
         /// <summary>Emulation thread, after each frame: move new samples into OpenAL.</summary>
         public void OnFrame(NdsEmulator nds)
         {

@@ -1,4 +1,5 @@
 using Px86.NintendoDS.EmulatorCore.Cartridge;
+using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
 using Px86.NintendoDS.FileFormats.Rom;
 
 namespace Px86.NintendoDS.EmulatorCore
@@ -12,6 +13,9 @@ namespace Px86.NintendoDS.EmulatorCore
         public string? Bios7Path { get; init; }
         public string? FirmwarePath { get; init; }
         public bool UseRealBios { get; init; }
+
+        /// <summary>Nickname, birthday, language… for the generated firmware (ignored when a firmware dump is given).</summary>
+        public FirmwareFlash.UserProfile? Profile { get; init; }
     }
 
     /// <summary>
@@ -63,6 +67,8 @@ namespace Px86.NintendoDS.EmulatorCore
 
             if (options.FirmwarePath != null)
                 emulator.LoadFirmware(File.ReadAllBytes(options.FirmwarePath));
+            else if (options.Profile != null)
+                emulator.LoadFirmware(FirmwareFlash.CreateDefault(options.Profile).Data.ToArray());
             else if (options.UseRealBios)
                 session.Messages.Add("Real-BIOS boot needs a firmware dump; falling back to direct boot.");
 

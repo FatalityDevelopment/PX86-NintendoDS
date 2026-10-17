@@ -51,12 +51,17 @@ namespace Px86.NintendoDS.Emulator
             if (cl.Scale is int scale) settings.Scale = Math.Clamp(scale, 1, 8);
             if (cl.SaveSettings) settings.Save();
 
+            using var host = new EmulatorHost();
+            var launcher = new GameLauncher(host, settings);
+            launcher.Message += m => Console.WriteLine("  " + m);
+
             GameSession? session = null;
             if (cl.RomPath != null)
             {
-                session = StartGame(LoadOptionsFor(cl.RomPath, settings, cl.SavePath));
+                session = launcher.Start(launcher.OptionsFor(cl.RomPath, cl.SavePath));
                 if (session == null)
                     return 1;
+                settings.AddRecentRom(cl.RomPath);
             }
 
             if (cl.Headless && !cl.ServerMode)
@@ -65,7 +70,6 @@ namespace Px86.NintendoDS.Emulator
                     return RunHeadless(session!, cl);
             }
 
-            using var host = new EmulatorHost();
             if (cl.TraceIo)
                 host.GameStarted += AttachIoTrace;
             if (session != null)
@@ -73,116 +77,50 @@ namespace Px86.NintendoDS.Emulator
             host.BreakHit += b => Console.WriteLine($"[BREAK] {b.Cpu} {b.Reason} at {b.Pc:X8}" +
                                                      (b.Reason == EmulatorCore.Debugging.BreakReason.Watchpoint ? $" ({(b.IsWrite ? "write" : "read")} {b.Address:X8})" : ""));
 
+            using var remote = new RemoteServices(host, launcher);
             using var shutdown = new ManualResetEventSlim();
-            PineSocket? pine = null;
-            GsStreamSocket? gs = null;
+            remote.ShutdownRequested += shutdown.Set;
+            if (cl.ServerMode)
+                remote.Log += Console.WriteLine;
+
+            bool gsOn = cl.Gs ?? (cl.ServerMode || settings.GsEnabled);
+            bool pineOn = cl.Pine ?? (cl.ServerMode || settings.PineEnabled);
             try
             {
-                if (cl.Gs ?? (cl.ServerMode || settings.GsEnabled))
-                {
-                    gs = new GsStreamSocket(host, cl.GsPort ?? settings.GsPort)
-                    {
-                        Codec = ParseCodec(cl.GsCodec ?? settings.GsCodec),
-                        Quality = cl.GsQuality ?? settings.GsQuality,
-                    };
-                    gs.Log += Console.WriteLine;
-                    gs.Start();
-                    Console.WriteLine($"GS stream listening on 127.0.0.1:{gs.Port} ({gs.Codec}).");
-                }
-                if (cl.Pine ?? (cl.ServerMode || settings.PineEnabled))
-                {
-                    pine = new PineSocket(host, cl.PinePort ?? settings.PinePort)
-                    {
-                        GsStream = gs,
-                        LoadOptions = path => LoadOptionsFor(path, settings, null),
-                    };
-                    pine.Log += Console.WriteLine;
-                    pine.ShutdownRequested += shutdown.Set;
-                    pine.Start();
-                    Console.WriteLine($"PINE listening on 127.0.0.1:{pine.Port}.");
-                }
+                if (gsOn && !remote.StartGs(cl.GsPort ?? settings.GsPort, RemoteServices.ParseCodec(cl.GsCodec ?? settings.GsCodec), cl.GsQuality ?? settings.GsQuality) && cl.ServerMode)
+                    return 1;
+                if (pineOn && !remote.StartPine(cl.PinePort ?? settings.PinePort) && cl.ServerMode)
+                    return 1;
             }
-            catch (System.Net.Sockets.SocketException ex)
+            catch (ArgumentException ex)
             {
-                Console.Error.WriteLine($"Could not open a socket: {ex.Message} (is another Px86.NintendoDS running?)");
-                pine?.Dispose();
-                gs?.Dispose();
-                return 1;
+                Console.Error.WriteLine(ex.Message);
+                return 2;
             }
 
-            using (pine)
-            using (gs)
+            host.Start(paused: cl.Paused);
+            if (cl.ServerMode)
             {
-                host.Start(paused: cl.Paused);
-                if (cl.ServerMode)
+                Console.WriteLine(session == null
+                    ? "Headless server: no game loaded, waiting for a PINE LoadRom."
+                    : $"Headless server running{(cl.Paused ? " (paused)" : "")}. Ctrl+C to stop.");
+                Console.CancelKeyPress += (_, e) =>
                 {
-                    Console.WriteLine(session == null
-                        ? "Headless server: no game loaded, waiting for a PINE LoadRom."
-                        : $"Headless server running{(cl.Paused ? " (paused)" : "")}. Ctrl+C to stop.");
-                    Console.CancelKeyPress += (_, e) =>
-                    {
-                        e.Cancel = true;
-                        shutdown.Set();
-                    };
-                    shutdown.Wait();
-                    Console.WriteLine("Stopping.");
-                }
-                else
-                {
-                    using var window = new EmulatorWindow(host, settings);
-                    if (pine != null)
-                        pine.ShutdownRequested += window.RequestClose;
-                    window.Run();
-                }
-                host.Stop();
+                    e.Cancel = true;
+                    shutdown.Set();
+                };
+                shutdown.Wait();
+                Console.WriteLine("Stopping.");
             }
+            else
+            {
+                using var window = new EmulatorWindow(host, settings, launcher, remote);
+                remote.ShutdownRequested += window.RequestClose;
+                window.Run();
+            }
+            host.Stop();
             return 0;
         }
-
-        private static GameSession? StartGame(GameLoadOptions options)
-        {
-            try
-            {
-                var session = GameSession.Start(options);
-                var header = session.Rom.Header;
-                Console.WriteLine($"Px86.NintendoDS — {header.Title} [{header.GameCode}]");
-                foreach (var message in session.Messages)
-                    Console.WriteLine("  " + message);
-                return session;
-            }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
-            {
-                Console.Error.WriteLine($"Could not start {options.RomPath}: {ex.Message}");
-                return null;
-            }
-        }
-
-        /// <summary>The options for starting <paramref name="romPath"/> with the configured dumps and save folder.</summary>
-        private static GameLoadOptions LoadOptionsFor(string romPath, EmulatorSettings settings, string? savePath) => new()
-        {
-            RomPath = romPath,
-            SavePath = savePath ?? SavePathFor(romPath, settings),
-            Bios9Path = settings.Bios9Path,
-            Bios7Path = settings.Bios7Path,
-            FirmwarePath = settings.FirmwarePath,
-            UseRealBios = settings.UseRealBios,
-        };
-
-        private static string? SavePathFor(string romPath, EmulatorSettings settings)
-        {
-            if (string.IsNullOrEmpty(settings.SaveDirectory))
-                return null;
-            Directory.CreateDirectory(settings.SaveDirectory);
-            return Path.Combine(settings.SaveDirectory, Path.GetFileNameWithoutExtension(romPath) + ".sav");
-        }
-
-        private static GsStreamCodec ParseCodec(string name) => name.ToLowerInvariant() switch
-        {
-            "jpeg" or "jpg" or "mjpeg" => GsStreamCodec.Mjpeg,
-            "png" => GsStreamCodec.Png,
-            "raw" or "rgba" => GsStreamCodec.RawRgba,
-            _ => throw new ArgumentException($"Unknown GS codec '{name}' (use jpeg, png or raw)."),
-        };
 
         private static readonly HashSet<NdsEmulator> Traced = new();
 

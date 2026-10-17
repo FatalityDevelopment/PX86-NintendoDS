@@ -1,9 +1,12 @@
 using System.Diagnostics;
+using ImGuiNET;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
 using Silk.NET.Windowing.Sdl;
+using Px86.NintendoDS.Emulator.Ui;
 using Px86.NintendoDS.EmulatorCore;
 using Px86.NintendoDS.EmulatorCore.Hosting;
 using Px86.NintendoDS.EmulatorCore.Video;
@@ -12,79 +15,83 @@ namespace Px86.NintendoDS.Emulator
 {
     /// <summary>
     /// The desktop window: an SDL window with an OpenGL context showing both
-    /// screens stacked vertically, keyboard/gamepad input and mouse touch.
+    /// screens (placed by <see cref="ScreenLayout"/>), a Dear ImGui menu bar
+    /// and tool windows, keyboard/gamepad input and mouse touch.
     ///
     /// The console runs on the <see cref="EmulatorHost"/>'s thread. The window
     /// thread (Silk.NET's loop) polls input, uploads the newest frame from
-    /// <see cref="EmulatorHost.FrameReady"/> to a texture and draws it
-    /// letterboxed. Audio is fed from <see cref="EmulatorHost.FrameEnded"/>.
+    /// <see cref="EmulatorHost.FrameReady"/> to a texture, draws it and then the
+    /// UI. Audio is fed from <see cref="EmulatorHost.FrameEnded"/>.
     /// </summary>
-    public sealed class EmulatorWindow : IDisposable
+    public sealed unsafe class EmulatorWindow : IDisposable
     {
         private readonly EmulatorHost _host;
         private readonly EmulatorSettings _settings;
+        private readonly GameLauncher _launcher;
+        private readonly RemoteServices _remote;
         private readonly IWindow _window;
         private readonly InputMapper _input;
-        private readonly AudioOutput? _audio;
+        private readonly Notifications _notifications = new();
+        private readonly FileBrowser _browser = new();
+        private AudioOutput? _audio;
 
         private readonly uint[] _sharedFrame = new uint[ScreenCapture.Width * ScreenCapture.Height];
         private readonly object _frameLock = new();
         private bool _frameReady;
-        private int _stateSlot;
         private volatile bool _closeRequested;
 
+        private GL? _gl;
         private ScreenRenderer? _renderer;
+        private ImGuiController? _imgui;
         private IInputContext? _inputContext;
+        private UiContext? _ui;
+        private MainMenu? _menu;
+        private SettingsWindow? _settingsWindow;
+        private ScreenLayout _layout;
+        private bool _touching;
         private readonly Stopwatch _titleTimer = Stopwatch.StartNew();
+        private static readonly Silk.NET.SDL.Sdl Sdl = Silk.NET.SDL.Sdl.GetApi();
 
-        public EmulatorWindow(EmulatorHost host, EmulatorSettings settings)
+        public EmulatorWindow(EmulatorHost host, EmulatorSettings settings, GameLauncher launcher, RemoteServices remote)
         {
             _host = host;
             _settings = settings;
+            _launcher = launcher;
+            _remote = remote;
             _input = new InputMapper(settings);
+            _layout = settings.Layout;
 
             NativeLibraries.Configure();
             SdlWindowing.Use();
             Silk.NET.Input.Sdl.SdlInput.RegisterPlatform();
 
+            var (width, height) = _layout.WindowSize(settings.Scale);
             var options = WindowOptions.Default with
             {
-                Size = new Vector2D<int>(ScreenCapture.Width * settings.Scale, ScreenCapture.Height * settings.Scale),
-                Title = WindowTitle(),
+                Size = new Vector2D<int>(width, height + 22),
+                Title = "Px86.NintendoDS",
                 VSync = true,
                 API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3)),
             };
             _window = Window.Create(options);
             _window.Load += OnLoad;
             _window.Render += OnRender;
-            _window.FramebufferResize += size => _renderer?.Resize(size.X, size.Y);
+            _window.FileDrop += OnFileDrop;
             _window.Closing += OnClosing;
 
-            if (settings.AudioEnabled)
-                _audio = AudioOutput.TryCreate();
-
+            _launcher.Message += _notifications.Add;
+            _remote.Log += _notifications.Add;
             _host.LocalInput = _input.Snapshot;
             _host.FrameReady += OnFrameReady;
-            if (_audio != null)
-                _host.FrameEnded += _audio.OnFrame;
+            _host.FrameEnded += OnFrameEnded;
+            _host.TurboSpeed = settings.TurboPercent / 100.0;
+            ApplyAudio();
         }
 
         public void Run() => _window.Run();
 
         /// <summary>Close the window from any thread (PINE Shutdown).</summary>
         public void RequestClose() => _closeRequested = true;
-
-        private string WindowTitle()
-        {
-            string title = "Px86.NintendoDS";
-            if (_host.Invoke(() => _host.Emulator?.Rom?.Header) is { } header)
-                title += $" — {header.Title} [{header.GameCode}]";
-            if (_host.Fps > 0) title += $" — {_host.Fps:F0} fps";
-            title += $" — slot {_stateSlot}";
-            if (_host.IsPaused) title += " — paused";
-            if (_host.FastForward) title += " — fast-forward";
-            return title;
-        }
 
         /// <summary>Emulation thread: keep the newest frame for the next redraw.</summary>
         private void OnFrameReady(uint[] frame, long frameNumber)
@@ -96,15 +103,74 @@ namespace Px86.NintendoDS.Emulator
             }
         }
 
+        private void OnFrameEnded(NdsEmulator nds) => _audio?.OnFrame(nds);
+
+        // ── Settings ──────────────────────────────────────────────────────────
+
+        private void ApplyVideo()
+        {
+            _layout = _settings.Layout;
+            _renderer?.SetFilter(_settings.LinearFilter);
+        }
+
+        private void ApplyAudio()
+        {
+            if (_settings.AudioEnabled && _audio == null)
+            {
+                _audio = AudioOutput.TryCreate();
+            }
+            else if (!_settings.AudioEnabled && _audio != null)
+            {
+                var old = _audio;
+                _audio = null;
+                _host.Invoke(() => { }); // let a frame in progress finish with the old output
+                old.Dispose();
+            }
+            _audio?.SetVolume(_settings.Volume / 100f);
+        }
+
+        private void ResizeWindow(int scale)
+        {
+            var (w, h) = _layout.WindowSize(scale);
+            _window.Size = new Vector2D<int>(w, h + (int)(_menu?.Height ?? 0));
+        }
+
+        private void ToggleFullscreen() =>
+            _window.WindowState = _window.WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
+
         // ── Window thread ─────────────────────────────────────────────────────
 
         private void OnLoad()
         {
-            var gl = GL.GetApi(_window);
-            _renderer = new ScreenRenderer(gl);
-            _renderer.Resize(_window.FramebufferSize.X, _window.FramebufferSize.Y);
+            _gl = GL.GetApi(_window);
+            _renderer = new ScreenRenderer(_gl);
+            _renderer.SetFilter(_settings.LinearFilter);
 
             _inputContext = _window.CreateInput();
+            _imgui = new ImGuiController(_gl, _window, _inputContext);
+            ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
+            ImGui.GetIO().NativePtr->IniFilename = null; // don't litter imgui.ini next to the exe
+
+            _ui = new UiContext
+            {
+                Host = _host,
+                Settings = _settings,
+                Launcher = _launcher,
+                Remote = _remote,
+                Notifications = _notifications,
+                Browser = _browser,
+                ApplyVideo = ApplyVideo,
+                ApplyAudio = ApplyAudio,
+                ApplyInput = () => _input.LoadBindings(_settings),
+                ResizeWindow = ResizeWindow,
+                ToggleFullscreen = ToggleFullscreen,
+                SaveScreenshot = SaveScreenshot,
+                CaptureGx = CaptureGx,
+                Quit = () => _window.Close(),
+            };
+            _settingsWindow = new SettingsWindow(_ui);
+            _menu = new MainMenu(_ui, _settingsWindow);
+
             foreach (var keyboard in _inputContext.Keyboards)
             {
                 keyboard.KeyDown += OnKeyDown;
@@ -112,24 +178,48 @@ namespace Px86.NintendoDS.Emulator
             }
             foreach (var mouse in _inputContext.Mice)
             {
-                mouse.MouseDown += (m, button) => { if (button == MouseButton.Left) UpdateTouch(m.Position, true); };
-                mouse.MouseUp += (m, button) => { if (button == MouseButton.Left) _input.SetTouch(null); };
-                mouse.MouseMove += (m, position) => { if (m.IsButtonPressed(MouseButton.Left)) UpdateTouch(position, true); };
+                mouse.MouseDown += (m, button) => { if (button == MouseButton.Left) BeginTouch(m.Position); };
+                mouse.MouseUp += (m, button) => { if (button == MouseButton.Left) EndTouch(); };
+                mouse.MouseMove += (m, position) => { if (_touching) UpdateTouch(position); };
             }
+
+            if (_host.Status == HostStatus.Shutdown)
+                _notifications.Add("Open a ROM with File > Open ROM (Ctrl+O) or drop a .nds file on the window.");
         }
 
         private void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
         {
+            if (_settingsWindow!.CapturingKey)
+            {
+                _settingsWindow.OnKeyCaptured(key);
+                return;
+            }
+
+            bool ctrl = keyboard.IsKeyPressed(Key.ControlLeft) || keyboard.IsKeyPressed(Key.ControlRight);
+            if (ctrl)
+            {
+                switch (key)
+                {
+                    case Key.O: _ui!.OpenRomDialog(); return;
+                    case Key.Q: _window.Close(); return;
+                    case Key.R: _host.Reset(); _notifications.Add("Reset"); return;
+                    case Key.Comma: _settingsWindow.Open(); return;
+                }
+            }
+
+            // A focused text field or the file browser gets the keyboard, not the game.
+            if (ImGui.GetIO().WantTextInput || _browser.IsOpen)
+                return;
+
             switch (key)
             {
                 case Key.Escape:
-                    _window.Close();
-                    return;
-                case Key.P:
-                    _host.TogglePause();
+                    // With a menu or popup open, Esc is ImGui's (close it); otherwise it hides/shows the bar.
+                    if (!ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopupId | ImGuiPopupFlags.AnyPopupLevel))
+                        _menu!.Visible = !_menu.Visible;
                     return;
                 case Key.F11:
-                    _window.WindowState = _window.WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
+                    ToggleFullscreen();
                     return;
                 case Key.F12:
                     SaveScreenshot();
@@ -138,45 +228,77 @@ namespace Px86.NintendoDS.Emulator
                     CaptureGx();
                     return;
                 case Key.F5:
-                    RunStateAction(() => _host.SaveState(_stateSlot), $"Saved state slot {_stateSlot}");
+                    _ui!.SaveState(_ui.StateSlot);
                     return;
                 case Key.F8:
-                    RunStateAction(() => _host.LoadState(_stateSlot), $"Loaded state slot {_stateSlot}", $"State slot {_stateSlot} is empty");
+                    _ui!.LoadState(_ui.StateSlot);
                     return;
                 case Key.F6:
                 case Key.F7:
-                    _stateSlot = (_stateSlot + (key == Key.F7 ? 1 : GameSession.StateSlots - 1)) % GameSession.StateSlots;
-                    Console.WriteLine($"State slot {_stateSlot}");
+                    _ui!.StateSlot = (_ui.StateSlot + (key == Key.F7 ? 1 : GameSession.StateSlots - 1)) % GameSession.StateSlots;
+                    _notifications.Add($"State slot {_ui.StateSlot}");
+                    return;
+                case Key.P when !_input.IsBound(key):
+                    _host.TogglePause();
+                    return;
+                case Key.N when !_input.IsBound(key):
+                    _host.FrameAdvance(1);
                     return;
             }
             _input.KeyDown(key);
         }
 
-        private static void RunStateAction(Func<bool> action, string done, string? notDone = null)
+        // ── Touch ─────────────────────────────────────────────────────────────
+
+        private ScreenRect GameArea()
         {
-            try
+            float scaleY = _window.FramebufferSize.Y / (float)Math.Max(_window.Size.Y, 1);
+            float menu = (_menu?.Height ?? 0) * scaleY;
+            return new ScreenRect(0, menu, _window.FramebufferSize.X, Math.Max(_window.FramebufferSize.Y - menu, 1));
+        }
+
+        private (int X, int Y)? TouchPoint(System.Numerics.Vector2 position)
+        {
+            // Mouse positions are in window units; the layout works in framebuffer pixels (HiDPI).
+            float sx = _window.FramebufferSize.X / (float)Math.Max(_window.Size.X, 1);
+            float sy = _window.FramebufferSize.Y / (float)Math.Max(_window.Size.Y, 1);
+            return _layout.ToTouch(GameArea(), position.X * sx, position.Y * sy);
+        }
+
+        private void BeginTouch(System.Numerics.Vector2 position)
+        {
+            if (ImGui.GetIO().WantCaptureMouse)
+                return; // the click is for a menu or window
+            if (TouchPoint(position) is { } p)
             {
-                Console.WriteLine(action() ? done : notDone ?? "No game running");
-            }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
-            {
-                Console.Error.WriteLine($"Save state failed: {ex.Message}");
+                _touching = true;
+                _input.SetTouch(p);
             }
         }
 
-        private void UpdateTouch(System.Numerics.Vector2 position, bool down)
+        private void UpdateTouch(System.Numerics.Vector2 position)
         {
-            if (_renderer == null)
-                return;
-            // Mouse positions are in window units; the renderer works in framebuffer pixels (HiDPI).
-            float sx = _window.FramebufferSize.X / (float)Math.Max(_window.Size.X, 1);
-            float sy = _window.FramebufferSize.Y / (float)Math.Max(_window.Size.Y, 1);
-            var point = _renderer.WindowToScreen(position.X * sx, position.Y * sy);
-            if (point is { } p && p.Y >= 192)
-                _input.SetTouch((p.X, p.Y - 192));
-            else if (down)
-                _input.SetTouch(null);
+            // Dragging off the screen keeps the last point instead of lifting the stylus.
+            if (TouchPoint(position) is { } p)
+                _input.SetTouch(p);
         }
+
+        private void EndTouch()
+        {
+            _touching = false;
+            _input.SetTouch(null);
+        }
+
+        private void OnFileDrop(string[] paths)
+        {
+            var rom = paths.FirstOrDefault(p => p.EndsWith(".nds", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".srl", StringComparison.OrdinalIgnoreCase));
+            if (rom != null)
+                _launcher.Load(rom);
+            else if (paths.FirstOrDefault(p => p.EndsWith(".gxcap", StringComparison.OrdinalIgnoreCase)) is { } gx)
+                _notifications.Add($"Replay GX captures from the command line: --replay-gx \"{gx}\"");
+        }
+
+        // ── Rendering ─────────────────────────────────────────────────────────
 
         private void OnRender(double delta)
         {
@@ -197,7 +319,19 @@ namespace Px86.NintendoDS.Emulator
                     _frameReady = false;
                 }
             }
-            _renderer!.Draw();
+
+            // Silk throws from FramebufferSize when SDL's error string is set, even by an
+            // unrelated failed call (e.g. an unsupported cursor shape on some X servers).
+            Sdl.ClearError();
+            _imgui!.Update((float)delta);
+            _menu!.Draw();
+            _settingsWindow!.Draw();
+            _browser.Draw();
+            _notifications.Draw();
+
+            var area = _host.Status == HostStatus.Shutdown ? new ScreenRect(0, 0, 0, 0) : GameArea();
+            _renderer!.Draw(_window.FramebufferSize.X, _window.FramebufferSize.Y, _layout, area);
+            _imgui.Render();
 
             if (_titleTimer.Elapsed.TotalSeconds >= 1)
             {
@@ -206,39 +340,57 @@ namespace Px86.NintendoDS.Emulator
             }
         }
 
-        private void SaveScreenshot()
+        private string WindowTitle()
+        {
+            string title = "Px86.NintendoDS";
+            if (_host.Invoke(() => _host.Emulator?.Rom?.Header) is { } header)
+                title += $" - {header.Title} [{header.GameCode}]";
+            if (_host.IsPaused && _host.Status != HostStatus.Shutdown) title += " - paused";
+            return title;
+        }
+
+        // ── Actions ───────────────────────────────────────────────────────────
+
+        private static string PicturesFolder()
         {
             string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Px86.NintendoDS");
             Directory.CreateDirectory(folder);
-            string code = _host.Invoke(() => _host.Emulator?.Rom?.Header.GameCode) ?? "NDS";
-            string path = Path.Combine(folder, $"{code}-{DateTime.Now:yyyyMMdd-HHmmss}.png");
+            return folder;
+        }
+
+        private string GameCode() => _host.Invoke(() => _host.Emulator?.Rom?.Header.GameCode) ?? "NDS";
+
+        private void SaveScreenshot()
+        {
+            if (_host.Status == HostStatus.Shutdown)
+                return;
+            string path = Path.Combine(PicturesFolder(), $"{GameCode()}-{DateTime.Now:yyyyMMdd-HHmmss}.png");
             lock (_frameLock)
-                Px86.NintendoDS.FileFormats.Images.PngWriter.Write(path, ScreenCapture.Width, ScreenCapture.Height, _sharedFrame);
-            Console.WriteLine($"Screenshot: {path}");
+                FileFormats.Images.PngWriter.Write(path, ScreenCapture.Width, ScreenCapture.Height, _sharedFrame);
+            _notifications.Add($"Screenshot: {path}");
         }
 
         /// <summary>F9: record the next 3D frame for bug reports (see docs/emulator.md).</summary>
         private void CaptureGx()
         {
-            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Px86.NintendoDS");
-            Directory.CreateDirectory(folder);
-            string code = _host.Invoke(() => _host.Emulator?.Rom?.Header.GameCode) ?? "NDS";
-            string path = Path.Combine(folder, $"{code}-{DateTime.Now:yyyyMMdd-HHmmss}{EmulatorCore.Video.Gpu3D.GxCapture.FileExtension}");
+            string path = Path.Combine(PicturesFolder(), $"{GameCode()}-{DateTime.Now:yyyyMMdd-HHmmss}{EmulatorCore.Video.Gpu3D.GxCapture.FileExtension}");
             if (!_host.CaptureGx(path, (file, error) =>
-                    Console.WriteLine(error == null ? $"GX capture: {file}" : $"GX capture failed: {error.Message}")))
-                Console.WriteLine("GX capture needs a running game.");
+                    _notifications.Add(error == null ? $"GX capture: {file}" : $"GX capture failed: {error.Message}")))
+                _notifications.Add("GX capture needs a running game.");
         }
 
         private void OnClosing()
         {
             _host.FrameReady -= OnFrameReady;
-            if (_audio != null)
-                _host.FrameEnded -= _audio.OnFrame;
+            _host.FrameEnded -= OnFrameEnded;
             _host.LocalInput = null;
             _host.Stop();
             _host.Invoke(() => _host.Session?.FlushSave());
+            _launcher.TrySaveSettings();
 
             // GL objects must go while the context still exists.
+            _imgui?.Dispose();
+            _imgui = null;
             _renderer?.Dispose();
             _renderer = null;
         }
@@ -246,7 +398,6 @@ namespace Px86.NintendoDS.Emulator
         public void Dispose()
         {
             _audio?.Dispose();
-            _renderer?.Dispose();
             _inputContext?.Dispose();
             _window.Dispose();
         }

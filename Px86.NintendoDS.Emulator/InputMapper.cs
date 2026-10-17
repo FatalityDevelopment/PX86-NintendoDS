@@ -25,8 +25,16 @@ namespace Px86.NintendoDS.Emulator
         private bool _fastForwardKey;
         private bool _fastForwardPad;
 
-        public InputMapper(EmulatorSettings settings)
+        public InputMapper(EmulatorSettings settings) => LoadBindings(settings);
+
+        /// <summary>(Re)read <see cref="EmulatorSettings.KeyBindings"/>.</summary>
+        public void LoadBindings(EmulatorSettings settings)
         {
+            lock (_lock)
+            {
+                _keyMap.Clear();
+                _keyboard = NdsButton.None;
+            }
             foreach (var (hostKey, button) in settings.KeyBindings)
             {
                 if (Enum.TryParse<Key>(hostKey, ignoreCase: true, out var key) &&
@@ -38,6 +46,19 @@ namespace Px86.NintendoDS.Emulator
         }
 
         public bool FastForward => _fastForwardKey || _fastForwardPad;
+
+        public bool IsBound(Key key) => _keyMap.ContainsKey(key);
+
+        /// <summary>Release everything (focus lost, menu opened…).</summary>
+        public void ReleaseAll()
+        {
+            lock (_lock)
+            {
+                _keyboard = NdsButton.None;
+                _touch = null;
+            }
+            _fastForwardKey = false;
+        }
 
         public void KeyDown(Key key)
         {
