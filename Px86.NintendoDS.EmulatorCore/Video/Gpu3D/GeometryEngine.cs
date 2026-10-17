@@ -194,9 +194,8 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
             {
                 for (int i = 0; i < 4; i++)
                 {
+                    // 00h is a NOP and is skipped wherever it sits; later bytes still count.
                     byte command = (byte)(value >> (i * 8));
-                    if (command == 0 && i > 0)
-                        break;
                     if (command != 0)
                         _packed.Enqueue(command);
                 }
@@ -242,8 +241,24 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
             Enqueue(command, value);
         }
 
+        /// <summary>Every command word entering the FIFO (for GX captures).</summary>
+        public event Action<byte, uint>? CommandQueued;
+
+        /// <summary>A swap happened at VBlank: <see cref="RenderList"/> is the finished frame. Raised before new commands run.</summary>
+        public event Action? BuffersSwapped;
+
+        /// <summary>Feed a command word straight into the FIFO (GX capture replay).</summary>
+        public void Replay(byte command, uint parameter) => Enqueue(command, parameter);
+
+        /// <summary>The polygons being built for the next frame.</summary>
+        public IReadOnlyList<Polygon3D> BuildingList => _building;
+
+        /// <summary>Number of parameter words <paramref name="command"/> takes (−1 = not a command).</summary>
+        public static int ParametersOf(byte command) => ParameterCount[command];
+
         private void Enqueue(byte command, uint parameter)
         {
+            CommandQueued?.Invoke(command, parameter);
             _fifo.Enqueue((command, parameter));
             Process();
         }
@@ -287,6 +302,7 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
             _building = new List<Polygon3D>(RenderList.Count);
             _buildingVertices = 0;
             SwapPending = false;
+            BuffersSwapped?.Invoke();
             Process();
         }
 
@@ -773,7 +789,7 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
                 long sx = ((v.X + w) * width) / (2 * w) + _viewportX1;
                 long syUp = ((v.Y + w) * height) / (2 * w) + _viewportY1;
                 v.ScreenX = (int)Math.Clamp(sx, 0, 256);
-                v.ScreenY = (int)Math.Clamp(191 - syUp, 0, 192);
+                v.ScreenY = (int)Math.Clamp(192 - syUp, 0, 192); // y = +w is the top edge (0), y = -w the bottom (192)
 
                 if (polygon.WBuffer)
                 {

@@ -34,6 +34,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             _devices[0] = power;
             _devices[1] = firmware;
             _devices[2] = touch;
+            touch.Calibrate(firmware.UserSettings);
         }
 
         public PowerManager Power { get; }
@@ -44,6 +45,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
         {
             Firmware = firmware;
             _devices[1] = firmware;
+            Touch.Calibrate(firmware.UserSettings);
         }
 
         public void Reset()
@@ -52,6 +54,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             _data = 0;
             _selected = -1;
             Power.Reset();
+            Touch.Calibrate(Firmware.UserSettings);
         }
 
         public ushort ReadControl() => _control;
@@ -99,6 +102,8 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             s.Sync(ref _selected);
             Firmware.Serialize(s);
             Touch.Serialize(s);
+            if (s.IsReading)
+                Touch.Calibrate(Firmware.UserSettings);
             Power.Serialize(s);
         }
     }

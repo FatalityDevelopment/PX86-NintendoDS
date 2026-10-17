@@ -139,6 +139,7 @@ namespace Px86.NintendoDS.EmulatorCore
                 if (address < _itcmWriteLimit)
                 {
                     MemoryAccess.Write32(Itcm, (int)(address & (ItcmSize - 4)), value);
+                    _nds.Code.OnWrite(Itcm, (int)(address & (ItcmSize - 4)));
                     return;
                 }
                 if (address - _dtcmBase < _dtcmWriteSize)
@@ -157,6 +158,7 @@ namespace Px86.NintendoDS.EmulatorCore
                 if (address < _itcmWriteLimit)
                 {
                     MemoryAccess.Write16(Itcm, (int)(address & (ItcmSize - 2)), value);
+                    _nds.Code.OnWrite(Itcm, (int)(address & (ItcmSize - 2)));
                     return;
                 }
                 if (address - _dtcmBase < _dtcmWriteSize)
@@ -175,6 +177,7 @@ namespace Px86.NintendoDS.EmulatorCore
                 if (address < _itcmWriteLimit)
                 {
                     Itcm[address & (ItcmSize - 1)] = value;
+                    _nds.Code.OnWrite(Itcm, (int)(address & (ItcmSize - 1)));
                     return;
                 }
                 if (address - _dtcmBase < _dtcmWriteSize)
@@ -184,6 +187,31 @@ namespace Px86.NintendoDS.EmulatorCore
                 }
             }
             BusWrite8(address, value);
+        }
+
+        /// <summary>Where code at <paramref name="address"/> lives, for the block cache (null = don't cache: VRAM, I/O…).</summary>
+        public byte[]? LocateCode(uint address, out int index)
+        {
+            if (address < _itcmReadLimit)
+            {
+                index = (int)(address & (ItcmSize - 1));
+                return Itcm;
+            }
+            switch (address >> 24)
+            {
+                case 0x02:
+                    index = (int)(address & NdsEmulator.MainRamMask);
+                    return _nds.MainRam;
+                case 0x03:
+                    index = SharedWramIndex(address, out bool mapped);
+                    return mapped ? _nds.SharedWram : null;
+                case 0xFF when address >= 0xFFFF0000u:
+                    index = (int)(address & 0xFFF);
+                    return _nds.Bios9;
+                default:
+                    index = 0;
+                    return null;
+            }
         }
 
         // ── System bus ────────────────────────────────────────────────────────
@@ -283,11 +311,17 @@ namespace Px86.NintendoDS.EmulatorCore
         {
             switch (address >> 24)
             {
-                case 0x02: MemoryAccess.Write32(_nds.MainRam, (int)(address & NdsEmulator.MainRamMask & ~3u), value); break;
+                case 0x02:
+                {
+                    int i = (int)(address & NdsEmulator.MainRamMask & ~3u);
+                    MemoryAccess.Write32(_nds.MainRam, i, value);
+                    if (_nds.Code.MainRamPageHasCode(i)) _nds.Code.OnWrite(_nds.MainRam, i);
+                    break;
+                }
                 case 0x03:
                 {
                     int i = SharedWramIndex(address & ~3u, out bool mapped);
-                    if (mapped) MemoryAccess.Write32(_nds.SharedWram, i, value);
+                    if (mapped) { MemoryAccess.Write32(_nds.SharedWram, i, value); _nds.Code.OnWrite(_nds.SharedWram, i); }
                     break;
                 }
                 case 0x04: WriteIo32(address & ~3u, value); break;
@@ -301,11 +335,17 @@ namespace Px86.NintendoDS.EmulatorCore
         {
             switch (address >> 24)
             {
-                case 0x02: MemoryAccess.Write16(_nds.MainRam, (int)(address & NdsEmulator.MainRamMask & ~1u), value); break;
+                case 0x02:
+                {
+                    int i = (int)(address & NdsEmulator.MainRamMask & ~1u);
+                    MemoryAccess.Write16(_nds.MainRam, i, value);
+                    if (_nds.Code.MainRamPageHasCode(i)) _nds.Code.OnWrite(_nds.MainRam, i);
+                    break;
+                }
                 case 0x03:
                 {
                     int i = SharedWramIndex(address & ~1u, out bool mapped);
-                    if (mapped) MemoryAccess.Write16(_nds.SharedWram, i, value);
+                    if (mapped) { MemoryAccess.Write16(_nds.SharedWram, i, value); _nds.Code.OnWrite(_nds.SharedWram, i); }
                     break;
                 }
                 case 0x04: WriteIo16(address & ~1u, value, 0xFFFF); break;
@@ -319,11 +359,17 @@ namespace Px86.NintendoDS.EmulatorCore
         {
             switch (address >> 24)
             {
-                case 0x02: _nds.MainRam[address & NdsEmulator.MainRamMask] = value; break;
+                case 0x02:
+                {
+                    int i = (int)(address & NdsEmulator.MainRamMask);
+                    _nds.MainRam[i] = value;
+                    if (_nds.Code.MainRamPageHasCode(i)) _nds.Code.OnWrite(_nds.MainRam, i);
+                    break;
+                }
                 case 0x03:
                 {
                     int i = SharedWramIndex(address, out bool mapped);
-                    if (mapped) _nds.SharedWram[i] = value;
+                    if (mapped) { _nds.SharedWram[i] = value; _nds.Code.OnWrite(_nds.SharedWram, i); }
                     break;
                 }
                 case 0x04: WriteIo8(address, value); break;

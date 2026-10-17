@@ -17,6 +17,7 @@
     <ProjectReference Include="..\Px86.NintendoDS.Common\Px86.NintendoDS.Common.csproj" />
     <ProjectReference Include="..\Px86.NintendoDS.EmulatorCore\Px86.NintendoDS.EmulatorCore.csproj" />
     <ProjectReference Include="..\Px86.NintendoDS.FileFormats\Px86.NintendoDS.FileFormats.csproj" />
+    <ProjectReference Include="..\Px86.NintendoDS.Emulator\Px86.NintendoDS.Emulator.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,9 +3,10 @@ using Silk.NET.OpenGL;
 namespace Px86.NintendoDS.Emulator
 {
     /// <summary>
-    /// Draws the 256×384 frame (both screens) as one texture, scaled to fit the
-    /// window with the aspect ratio kept (nearest-neighbour, letterboxed).
-    /// OpenGL 3.3 core: one VAO, one shader, one BGRA texture.
+    /// Draws the two DS screens from the 256×384 frame texture (top screen in
+    /// the upper half) as two quads placed by a <see cref="ScreenLayout"/>.
+    /// Nearest-neighbour or linear filtering. OpenGL 3.3 core: one VAO, one
+    /// shader, one BGRA texture; the quad vertices are rebuilt per draw.
     /// </summary>
     public sealed unsafe class ScreenRenderer : IDisposable
     {
@@ -25,7 +26,7 @@ namespace Px86.NintendoDS.Emulator
             in vec2 vUv;
             out vec4 color;
             uniform sampler2D screen;
-            void main() { color = texture(screen, vUv); }
+            void main() { color = vec4(texture(screen, vUv).rgb, 1.0); }
             """;
 
         private readonly GL _gl;
@@ -33,29 +34,19 @@ namespace Px86.NintendoDS.Emulator
         private readonly uint _vbo;
         private readonly uint _program;
         private readonly uint _texture;
-        private int _windowWidth = 1, _windowHeight = 1;
-        private (int X, int Y, int W, int H) _viewport;
+        private readonly float[] _vertices = new float[2 * 4 * 4];
+        private bool _linear;
 
         public ScreenRenderer(GL gl)
         {
             _gl = gl;
-
             _program = CreateProgram();
 
-            float[] quad =
-            {
-                // x, y, u, v (v = 0 at the top row of the frame)
-                -1f,  1f, 0f, 0f,
-                -1f, -1f, 0f, 1f,
-                 1f,  1f, 1f, 0f,
-                 1f, -1f, 1f, 1f,
-            };
             _vao = _gl.GenVertexArray();
             _gl.BindVertexArray(_vao);
             _vbo = _gl.GenBuffer();
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-            fixed (float* data = quad)
-                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(quad.Length * sizeof(float)), data, BufferUsageARB.StaticDraw);
+            _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(_vertices.Length * sizeof(float)), null, BufferUsageARB.DynamicDraw);
             _gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), (void*)0);
             _gl.EnableVertexAttribArray(0);
             _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), (void*)(2 * sizeof(float)));
@@ -63,8 +54,7 @@ namespace Px86.NintendoDS.Emulator
 
             _texture = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, _texture);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            SetFilter(false);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, TextureWidth, TextureHeight, 0,
@@ -95,27 +85,17 @@ namespace Px86.NintendoDS.Emulator
             return program;
         }
 
-        public void Resize(int width, int height)
+        /// <summary>Linear (smooth) or nearest-neighbour (sharp pixels) scaling.</summary>
+        public void SetFilter(bool linear)
         {
-            _windowWidth = Math.Max(width, 1);
-            _windowHeight = Math.Max(height, 1);
-            double scale = Math.Min(_windowWidth / (double)TextureWidth, _windowHeight / (double)TextureHeight);
-            int w = (int)(TextureWidth * scale), h = (int)(TextureHeight * scale);
-            _viewport = ((_windowWidth - w) / 2, (_windowHeight - h) / 2, w, h);
+            _linear = linear;
+            _gl.BindTexture(TextureTarget.Texture2D, _texture);
+            int filter = (int)(linear ? TextureMinFilter.Linear : TextureMinFilter.Nearest);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, filter);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, filter);
         }
 
-        /// <summary>Window pixel → DS frame pixel (0–255, 0–383), or null outside the picture.</summary>
-        public (int X, int Y)? WindowToScreen(float x, float y)
-        {
-            var (vx, vy, vw, vh) = _viewport;
-            // Window coordinates have y down; the viewport is in GL coordinates (y up).
-            float topY = _windowHeight - (vy + vh);
-            int sx = (int)((x - vx) * TextureWidth / vw);
-            int sy = (int)((y - topY) * TextureHeight / vh);
-            if (sx < 0 || sx >= TextureWidth || sy < 0 || sy >= TextureHeight)
-                return null;
-            return (sx, sy);
-        }
+        public bool LinearFilter => _linear;
 
         public void Upload(uint[] frame)
         {
@@ -125,19 +105,52 @@ namespace Px86.NintendoDS.Emulator
                     PixelFormat.Bgra, PixelType.UnsignedByte, data);
         }
 
-        public void Draw()
+        /// <summary>Clear the window and draw the screens where <paramref name="layout"/> puts them inside <paramref name="area"/>.</summary>
+        public void Draw(int windowWidth, int windowHeight, ScreenLayout layout, ScreenRect area)
         {
-            _gl.Viewport(0, 0, (uint)_windowWidth, (uint)_windowHeight);
+            // ImGui leaves scissoring/blending on after drawing its windows.
+            _gl.Disable(EnableCap.ScissorTest);
+            _gl.Disable(EnableCap.Blend);
+            _gl.Viewport(0, 0, (uint)Math.Max(windowWidth, 1), (uint)Math.Max(windowHeight, 1));
             _gl.ClearColor(0f, 0f, 0f, 1f);
             _gl.Clear(ClearBufferMask.ColorBufferBit);
 
-            var (x, y, w, h) = _viewport;
-            _gl.Viewport(x, y, (uint)w, (uint)h);
+            var (top, bottom) = layout.Compute(area);
+            int quads = 0;
+            if (!top.IsEmpty) AddQuad(quads++, top, layout.CornerUvs(0f, 0.5f), windowWidth, windowHeight);
+            if (!bottom.IsEmpty) AddQuad(quads++, bottom, layout.CornerUvs(0.5f, 1f), windowWidth, windowHeight);
+            if (quads == 0)
+                return;
+
             _gl.UseProgram(_program);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, _texture);
             _gl.BindVertexArray(_vao);
-            _gl.DrawArrays(PrimitiveType.TriangleStrip, 0, 4);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+            fixed (float* data = _vertices)
+                _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, (nuint)(quads * 16 * sizeof(float)), data);
+            for (int q = 0; q < quads; q++)
+                _gl.DrawArrays(PrimitiveType.TriangleStrip, q * 4, 4);
+        }
+
+        /// <summary>Quad corners as a triangle strip: top-left, bottom-left, top-right, bottom-right.</summary>
+        private void AddQuad(int index, ScreenRect r, (float U, float V)[] uv, int windowWidth, int windowHeight)
+        {
+            float NdcX(float x) => x / windowWidth * 2 - 1;
+            float NdcY(float y) => 1 - y / windowHeight * 2;
+            float l = NdcX(r.X), rt = NdcX(r.X + r.Width), t = NdcY(r.Y), b = NdcY(r.Y + r.Height);
+            int o = index * 16;
+            void Put(int i, float x, float y, (float U, float V) c)
+            {
+                _vertices[o + i * 4] = x;
+                _vertices[o + i * 4 + 1] = y;
+                _vertices[o + i * 4 + 2] = c.U;
+                _vertices[o + i * 4 + 3] = c.V;
+            }
+            Put(0, l, t, uv[0]);
+            Put(1, l, b, uv[2]);
+            Put(2, rt, t, uv[1]);
+            Put(3, rt, b, uv[3]);
         }
 
         public void Dispose()

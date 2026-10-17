@@ -191,6 +191,24 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
             }
         }
 
+        /// <summary>The rendering registers (DISP3DCNT, clear, fog, toon, edge colours…).</summary>
+        public SoftwareRasterizer.RenderSettings Settings => _settings;
+
+        public void SerializeRenderSettings(StateSerializer s)
+        {
+            s.Section("Render");
+            s.Sync(ref _settings.Disp3DControl);
+            s.Sync(ref _settings.ClearColor);
+            s.Sync(ref _settings.ClearDepth);
+            s.Sync(ref _settings.ClearImageOffset);
+            s.Sync(ref _settings.AlphaTestRef);
+            s.Sync(ref _settings.FogColor);
+            s.Sync(ref _settings.FogOffset);
+            s.Sync(_settings.FogTable);
+            s.Sync(_settings.ToonTable);
+            s.Sync(_settings.EdgeColors);
+        }
+
         public void Serialize(StateSerializer s)
         {
             s.Section("Gpu3D");

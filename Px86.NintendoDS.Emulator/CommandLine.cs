@@ -11,9 +11,16 @@ namespace Px86.NintendoDS.Emulator
     ///     --real-bios           Boot through BIOS + firmware instead of direct boot
     ///     --save &lt;path&gt;         Save file (default: &lt;rom&gt;.sav)
     ///     --scale &lt;n&gt;           Window scale
-    ///     --headless            No window: run --frames frames, then exit
+    ///     --headless            No window. With --frames/--screenshot: run, then exit.
+    ///                           Without: run as a server (PINE + GS stream) until stopped
     ///     --frames &lt;n&gt;          Frames to run headless (default 600)
     ///     --screenshot &lt;png&gt;    Headless: write both screens as a PNG at the end
+    ///     --pine [port]         Open the PINE socket (default port 28013)
+    ///     --gs [port]           Open the GS frame-stream socket (default port 28014)
+    ///     --no-pine, --no-gs    Keep a socket closed in headless server mode
+    ///     --gs-codec &lt;c&gt;        jpeg (default), png or raw
+    ///     --gs-quality &lt;n&gt;      JPEG quality 1–100 (default 85)
+    ///     --paused              Start paused (set breakpoints first, then resume over PINE)
     ///     --trace-io            Log unhandled I/O register accesses
     ///     --save-settings       Store the given BIOS/firmware/scale options as defaults
     /// </summary>
@@ -27,9 +34,20 @@ namespace Px86.NintendoDS.Emulator
         public bool RealBios { get; private set; }
         public int? Scale { get; private set; }
         public bool Headless { get; private set; }
-        public int Frames { get; private set; } = 600;
+        public int? Frames { get; private set; }
         public string? ScreenshotPath { get; private set; }
         public bool TraceIo { get; private set; }
+        public bool? Pine { get; private set; }
+        public int? PinePort { get; private set; }
+        public bool? Gs { get; private set; }
+        public int? GsPort { get; private set; }
+        public string? GsCodec { get; private set; }
+        public int? GsQuality { get; private set; }
+        public bool Paused { get; private set; }
+        public string? ReplayGxPath { get; private set; }
+
+        /// <summary>Headless without a fixed frame count: keep running and serve PINE/GS.</summary>
+        public bool ServerMode => Headless && Frames == null && ScreenshotPath == null;
         public bool SaveSettings { get; private set; }
         public bool ShowHelp { get; private set; }
 
@@ -41,6 +59,15 @@ namespace Px86.NintendoDS.Emulator
             {
                 string arg = args[i];
                 string Next() => i + 1 < args.Length ? args[++i] : throw new ArgumentException($"{arg} needs a value.");
+                int? OptionalPort()
+                {
+                    if (i + 1 < args.Length && int.TryParse(args[i + 1], out int port))
+                    {
+                        i++;
+                        return port is >= 0 and <= 65535 ? port : throw new ArgumentException($"{arg}: bad port {port}.");
+                    }
+                    return null;
+                }
 
                 switch (arg)
                 {
@@ -55,6 +82,14 @@ namespace Px86.NintendoDS.Emulator
                     case "--frames": cl.Frames = int.Parse(Next()); break;
                     case "--screenshot": cl.ScreenshotPath = Next(); break;
                     case "--trace-io": cl.TraceIo = true; break;
+                    case "--pine": cl.Pine = true; cl.PinePort = OptionalPort() ?? cl.PinePort; break;
+                    case "--gs": cl.Gs = true; cl.GsPort = OptionalPort() ?? cl.GsPort; break;
+                    case "--no-pine": cl.Pine = false; break;
+                    case "--no-gs": cl.Gs = false; break;
+                    case "--gs-codec": cl.GsCodec = Next(); break;
+                    case "--gs-quality": cl.GsQuality = int.Parse(Next()); break;
+                    case "--paused": cl.Paused = true; break;
+                    case "--replay-gx": cl.ReplayGxPath = Next(); break;
                     case "--save-settings": cl.SaveSettings = true; break;
                     case "-h":
                     case "--help": cl.ShowHelp = true; break;
@@ -78,7 +113,7 @@ namespace Px86.NintendoDS.Emulator
         public const string HelpText = """
             Px86.NintendoDS — Nintendo DS emulator
 
-            Usage: Px86.NintendoDS.Emulator <game.nds> [options]
+            Usage: Px86.NintendoDS.Emulator [game.nds] [options]
 
               --rom <path>          ROM to load (or pass it as the first argument)
               --bios9 <path>        ARM9 BIOS dump (4 KB)      optional
@@ -87,15 +122,25 @@ namespace Px86.NintendoDS.Emulator
               --real-bios           Boot through BIOS + firmware instead of direct boot
               --save <path>         Save file (default: <rom>.sav)
               --scale <n>           Window scale (default 2)
-              --headless            No window: run --frames frames, then exit
+              --headless            No window. With --frames/--screenshot: run, then exit.
+                                    Without them: run as a server for CodeDesigner and
+                                    other tools (PINE + GS stream) until Ctrl+C
               --frames <n>          Frames to run in headless mode (default 600)
               --screenshot <png>    Headless: write both screens to a PNG at the end
+              --pine [port]         Open the PINE socket (default 28013, 127.0.0.1 only)
+              --gs [port]           Open the GS frame-stream socket (default 28014)
+              --no-pine, --no-gs    Keep a socket closed in headless server mode
+              --gs-codec <c>        GS stream format: jpeg (default), png or raw
+              --gs-quality <n>      GS stream JPEG quality 1-100 (default 85)
+              --paused              Start paused (resume over PINE or with P)
+              --replay-gx <file>    Re-render a GX capture (F9) to --screenshot (or <file>.png)
+                                    and write a polygon/command dump to <file>.txt
               --trace-io            Log unhandled I/O register accesses
               --save-settings       Remember the BIOS/firmware/scale options
 
             Controls (default): arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,
             Enter = Start, Backspace = Select, mouse = touch screen, Tab = fast-forward,
-            P = pause, F5 = save state, F8 = load state, F6/F7 = state slot,
+            P = pause, F9 = GX capture (3D bug report), F5 = save state, F8 = load state, F6/F7 = state slot,
             F11 = fullscreen, F12 = screenshot, Esc = quit. Gamepads are supported.
             """;
     }

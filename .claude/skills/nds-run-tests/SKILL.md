@@ -25,6 +25,18 @@ dotnet run --project Px86.NintendoDS.Emulator -c Release -- some.nds --headless 
 ```
 Read the PNG to check rendering (top screen above, bottom below). The output also reports the speed (% of 59.83 fps).
 
+## Headless server, PINE and GS stream
+
+`... game.nds --headless` (no `--frames`) runs a server: PINE on 127.0.0.1:28013 and GS frames on
+28014.
+- In tests, use `HostFixture` and `TestPineClient` (`TestProject/Remote/RemoteTestFixture.cs`), and pass
+  port 0 so parallel tests don't collide.
+- By hand, a few lines of Python with `socket` + `struct` are enough. Packets are
+  `[u32 size][opcode][args]`; see docs/pine-protocol.md.
+- To check JPEG output with a real decoder, run the tests with `PX86_JPEG_DUMP=<dir>` and open the files
+  with PIL (`python3 -I -c "from PIL import Image; Image.open(...).load()"`).
+- The apphost needs `DOTNET_ROOT=$HOME/.dotnet` when .NET is installed under the home folder.
+
 ## The real window without a display
 ```bash
 xvfb-run -s "-screen 0 800x900x24" bash -c 'timeout 8 dotnet run --project Px86.NintendoDS.Emulator -c Release --no-build -- some.nds & sleep 6; import -window root /tmp/screen.png; wait'

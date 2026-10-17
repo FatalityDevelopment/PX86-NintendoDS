@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Px86.NintendoDS.Common.Core;
 
 namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
@@ -13,8 +14,12 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
     ///   Channel 1 = Y, 5 = X (12-bit ADC), 3/4 = Z1/Z2 pressure, 6 = microphone, 0/7 = temperature.
     ///   Released pen: X = 0, Y = 0xFFF.
     ///
-    /// The default firmware calibrates ADC = 0x100 + pixel × 14 (X) and
-    /// 0x0B0 + pixel × 19 (Y), roughly matching real hardware ranges.
+    /// Games turn ADC values into pixels with the two calibration points in
+    /// the firmware user settings (GBATEK "DS Firmware User Settings" 58h–63h):
+    ///   scr.x = (adc.x − adc.x1) × (scr.x2 − scr.x1) / (adc.x2 − adc.x1) + (scr.x1 − 1)
+    /// so the emulated stylus inverts that formula with the calibration of
+    /// whichever firmware is loaded (a real dump or the generated one), and a
+    /// tap lands exactly where the mouse clicked.
     ///
     /// Reference: GBATEK "DS Touch Screen Controller (TSC)".
     /// </summary>
@@ -26,8 +31,46 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
         private ushort _result;
         private int _byteIndex;
 
+        /// <summary>Default mapping, used by the generated firmware: ADC = 0x100 + pixel × 14 (X), 0x0B0 + pixel × 19 (Y).</summary>
         public static int PixelToAdcX(int x) => 0x100 + x * 14;
         public static int PixelToAdcY(int y) => 0x0B0 + y * 19;
+
+        private Calibration _calibration = Calibration.Default;
+
+        /// <summary>One axis' two calibration points (adc1 at pixel scr1−1, adc2 at pixel scr2−1).</summary>
+        public readonly record struct Axis(int Adc1, int Scr1, int Adc2, int Scr2)
+        {
+            public bool IsValid => Scr2 > Scr1 && Adc2 != Adc1;
+
+            /// <summary>Pixel → ADC: the inverse of the conversion games do.</summary>
+            public int ToAdc(int pixel) =>
+                Math.Clamp(Adc1 + (int)Math.Round((pixel - (Scr1 - 1)) * (double)(Adc2 - Adc1) / (Scr2 - Scr1)), 0, 0xFFF);
+
+            /// <summary>ADC → pixel, exactly as GBATEK gives it (integer division).</summary>
+            public int ToPixel(int adc) => (adc - Adc1) * (Scr2 - Scr1) / (Adc2 - Adc1) + (Scr1 - 1);
+        }
+
+        public readonly record struct Calibration(Axis X, Axis Y)
+        {
+            public static readonly Calibration Default = new(
+                new Axis(PixelToAdcX(0), 1, PixelToAdcX(255), 256),
+                new Axis(PixelToAdcY(0), 1, PixelToAdcY(191), 192));
+
+            /// <summary>Read the calibration from firmware user settings (falls back to <see cref="Default"/> if it's unusable).</summary>
+            public static Calibration FromUserSettings(ReadOnlySpan<byte> settings)
+            {
+                if (settings.Length < 0x64)
+                    return Default;
+                var x = new Axis(BinaryPrimitives.ReadUInt16LittleEndian(settings[0x58..]) & 0xFFF, settings[0x5C], BinaryPrimitives.ReadUInt16LittleEndian(settings[0x5E..]) & 0xFFF, settings[0x62]);
+                var y = new Axis(BinaryPrimitives.ReadUInt16LittleEndian(settings[0x5A..]) & 0xFFF, settings[0x5D], BinaryPrimitives.ReadUInt16LittleEndian(settings[0x60..]) & 0xFFF, settings[0x63]);
+                return x.IsValid && y.IsValid ? new Calibration(x, y) : Default;
+            }
+        }
+
+        public Calibration CurrentCalibration => _calibration;
+
+        /// <summary>Use the calibration stored in these firmware user settings.</summary>
+        public void Calibrate(ReadOnlySpan<byte> userSettings) => _calibration = Calibration.FromUserSettings(userSettings);
 
         /// <summary>Microphone level 0–4095 (2048 = silence).</summary>
         public int MicrophoneLevel { get; set; } = 0x800;
@@ -58,8 +101,8 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
                 int channel = (value >> 4) & 7;
                 int conversion = channel switch
                 {
-                    1 => _penDown ? PixelToAdcY(_y) : 0xFFF,
-                    5 => _penDown ? PixelToAdcX(_x) : 0,
+                    1 => _penDown ? _calibration.Y.ToAdc(_y) : 0xFFF,
+                    5 => _penDown ? _calibration.X.ToAdc(_x) : 0,
                     3 => _penDown ? 0x100 : 0,
                     4 => _penDown ? 0xF00 : 0xFFF,
                     6 => MicrophoneLevel,

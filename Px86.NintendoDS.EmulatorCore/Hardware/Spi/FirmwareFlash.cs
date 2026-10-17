@@ -241,9 +241,10 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             Encoding.Unicode.GetBytes(message).CopyTo(s, 0x1C);
             BinaryPrimitives.WriteUInt16LittleEndian(s.AsSpan(0x50), (ushort)message.Length);
 
-            // Touch calibration points match TouchScreen.PixelToAdcX/Y, so the conversion is exact.
-            WriteCalibrationPoint(s, 0x58, 0, 0);
-            WriteCalibrationPoint(s, 0x5E, 255, 191);
+            // Calibration points inset from the corners like a real console's, on the
+            // TouchScreen.PixelToAdcX/Y line. Pixel positions are stored 1-based.
+            WriteCalibrationPoint(s, 0x58, 31, 31);
+            WriteCalibrationPoint(s, 0x5E, 223, 159);
 
             ushort flags = (ushort)((profile.Language & 7) | 0xFC00);
             BinaryPrimitives.WriteUInt16LittleEndian(s.AsSpan(0x64), flags);
