@@ -111,6 +111,36 @@ namespace Px86.NintendoDS.TestProject.Hardware
             }
         }
 
+        [TestMethod]
+        [DoNotParallelize]
+        public void OwnLoopedBackDatagramDoesNotEndTheWait()
+        {
+            int port = 20000 + Random.Shared.Next(20000);
+            LocalWifiMedium a, b;
+            try
+            {
+                a = new LocalWifiMedium(port);
+                b = new LocalWifiMedium(port);
+            }
+            catch (System.Net.Sockets.SocketException ex)
+            {
+                Assert.Inconclusive($"No loopback multicast here: {ex.Message}");
+                return;
+            }
+            using (a)
+            using (b)
+            {
+                // Like a multiplay master: its own CMD loops back first, the slave's REPLY comes later.
+                var frame = new byte[24];
+                a.Send(new WifiPacket { Frame = frame, Sender = 1 });
+                Thread.Sleep(20);
+                using var reply = new Timer(_ => b.Send(new WifiPacket { Frame = frame, Sender = 2, ReplyAid = 1 }), null, 50, Timeout.Infinite);
+                Assert.IsTrue(a.TryReceive(1, TimeSpan.FromSeconds(5), out var packet), "kept waiting past our own datagram");
+                Assert.AreEqual(2, packet.Sender);
+                Assert.AreEqual(1, packet.ReplyAid);
+            }
+        }
+
         /// <summary>Run a master and a slave on their own threads (like two windows) and check the multiplay round.</summary>
         private static void RunMultiplay(NdsEmulator master, NdsEmulator slave)
         {

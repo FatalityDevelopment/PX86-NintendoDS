@@ -113,11 +113,16 @@ namespace Px86.NintendoDS.EmulatorCore.Network
 
         public bool TryReceive(long receiver, TimeSpan timeout, out WifiPacket packet)
         {
-            while (timeout <= TimeSpan.Zero ? _received.TryTake(out packet!) : _received.TryTake(out packet!, timeout))
+            // Our own datagrams loop back too. Skipping one must not end the wait: a multiplay
+            // master's own CMD comes back just before the slaves' replies.
+            var deadline = DateTime.UtcNow + timeout;
+            while (true)
             {
+                var left = deadline - DateTime.UtcNow;
+                if (!(left <= TimeSpan.Zero ? _received.TryTake(out packet!) : _received.TryTake(out packet!, left)))
+                    break;
                 if (packet.Sender != receiver)
                     return true;
-                timeout = TimeSpan.Zero; // our own datagram looped back: skip it
             }
             packet = null!;
             return false;
