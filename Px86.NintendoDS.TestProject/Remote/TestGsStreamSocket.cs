@@ -42,14 +42,15 @@ namespace Px86.NintendoDS.TestProject.Remote
             using var client = new TcpClient("127.0.0.1", gs.Port);
             client.ReceiveTimeout = 10_000;
             var stream = client.GetStream();
-            uint firstIndex = 0;
-            for (int i = 0; i < 3; i++)
+            uint firstIndex = 0, lastIndex = 0;
+            for (int i = 0; i < 4; i++)
             {
                 var m = ReadMessage(stream);
                 Assert.AreEqual(GsStreamSocket.MessageTypeFrame, m[4], "type = frame");
                 uint index = BinaryPrimitives.ReadUInt32LittleEndian(m.AsSpan(5));
                 if (i == 0) firstIndex = index;
-                else Assert.IsTrue(index > firstIndex, "frame numbers increase");
+                else Assert.IsTrue(index >= lastIndex, "frame numbers never go down");
+                lastIndex = index;
                 Assert.AreEqual((ushort)256, BinaryPrimitives.ReadUInt16LittleEndian(m.AsSpan(9)), "width");
                 Assert.AreEqual((ushort)384, BinaryPrimitives.ReadUInt16LittleEndian(m.AsSpan(11)), "height");
                 Assert.AreEqual((byte)GsStreamCodec.Mjpeg, m[13], "codec");
@@ -57,7 +58,12 @@ namespace Px86.NintendoDS.TestProject.Remote
                 Assert.AreEqual(0xFF, m[15]); Assert.AreEqual(0xD8, m[16], "payload starts with SOI");
                 Assert.AreEqual(0xFF, m[^2]); Assert.AreEqual(0xD9, m[^1], "payload ends with EOI");
             }
-            Assert.IsTrue(gs.FramesDelivered >= 3, "delivery counted");
+            // The server counts a frame after its write returns, which can be just after we read it.
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (gs.FramesDelivered < 2 && timer.ElapsedMilliseconds < 5000)
+                Thread.Sleep(5);
+            Assert.IsTrue(lastIndex > firstIndex, "the stream moves on");
+            Assert.IsTrue(gs.FramesDelivered >= 2, "broadcast deliveries counted");
         }
 
         [TestMethod]

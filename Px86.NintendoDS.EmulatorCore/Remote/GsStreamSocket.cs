@@ -39,7 +39,9 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
     /// Frames are encoded on this socket's own thread, only while somebody is
     /// subscribed, and at most <see cref="MaxFps"/> per second. If encoding
     /// falls behind, older frames are skipped (counted in <see cref="FramesDropped"/>).
-    /// A subscriber that can't take a frame within 250 ms is disconnected.
+    /// A subscriber that can't take a frame within 250 ms is disconnected. A new
+    /// subscriber first gets the current picture, so frame numbers never go
+    /// down but the first one may repeat.
     /// </summary>
     public sealed class GsStreamSocket : IDisposable
     {
@@ -56,6 +58,7 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
         private readonly AutoResetEvent _frameArrived = new(false);
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private long _pendingIndex = -1;
+        private long _lastTakenIndex = -1;
         private long _lastSentTicks;
         private TcpListener? _listener;
         private Thread? _acceptThread;
@@ -146,7 +149,9 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                 return;
             lock (_frameLock)
             {
-                if (_pendingIndex >= 0)
+                if (index <= _lastTakenIndex)
+                    return; // already sent (or older)
+                if (_pendingIndex >= 0 && index > _pendingIndex)
                     Interlocked.Increment(ref _dropped);
                 frame.CopyTo(_pending, 0);
                 _pendingIndex = index;
@@ -174,6 +179,7 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                         continue;
                     _pending.CopyTo(_encoding, 0);
                     _pendingIndex = -1;
+                    _lastTakenIndex = index;
                 }
 
                 _lastSentTicks = _clock.ElapsedTicks;
@@ -243,16 +249,23 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                 }
                 client.NoDelay = true;
                 client.SendTimeout = 250;
+
+                // Greet the new client with the current picture (useful while paused), then add it.
+                byte[]? greeting = _host.Invoke(() =>
+                    _host.Emulator is { } nds ? BuildMessage(ScreenCapture.Compose(nds), nds.FrameCount, Codec, _jpeg) : null);
+                try
+                {
+                    if (greeting != null)
+                        client.GetStream().Write(greeting);
+                }
+                catch (Exception ex) when (ex is IOException or SocketException)
+                {
+                    client.Close();
+                    continue;
+                }
                 lock (_subscribers)
                     _subscribers.Add(client);
                 Log?.Invoke($"[GS] subscriber connected ({SubscriberCount} total)");
-
-                // Show something straight away, even while paused.
-                _host.Invoke(() =>
-                {
-                    if (_host.Emulator is { } nds)
-                        OnFrame(ScreenCapture.Compose(nds), nds.FrameCount);
-                });
             }
         }
 
