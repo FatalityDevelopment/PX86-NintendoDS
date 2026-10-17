@@ -37,7 +37,7 @@ Px86.NintendoDS.sln
 │   ├── Arm9MemoryBus.cs / Arm7MemoryBus.cs   # Memory maps + I/O dispatch
 │   ├── DirectBoot.cs, GameSession.cs
 │   ├── Hosting/EmulatorHost.cs      # Runs the console on its own thread; thread-safe control (Invoke, pause, step…)
-│   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory access
+│   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory access, game debug output (no$gba ports)
 │   ├── Remote/                      # PINE socket (28013) + GS frame stream (28014), see docs/pine-protocol.md
 │   ├── Network/                     # Local wireless (UDP multicast), software access point + NAT router (online)
 │   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, Wifi/, system control

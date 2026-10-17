@@ -117,6 +117,13 @@ namespace Px86.NintendoDS.Common.Cpu
         /// </summary>
         public Func<ArmCpu, uint, bool>? SwiHandler { get; set; }
 
+        /// <summary>
+        /// Called when "mov r12,r12" (ARM E1A0C00Ch / Thumb 46E4h) executes: the
+        /// no$gba debug-message marker (GBATEK "Debug Messages"). The instruction
+        /// itself still runs normally.
+        /// </summary>
+        public Action<ArmCpu>? NoCashMessage { get; set; }
+
         /// <summary>Raised for opcodes the interpreter doesn't implement.</summary>
         public event Action<ArmCpu, uint, uint>? UnknownInstruction;
 

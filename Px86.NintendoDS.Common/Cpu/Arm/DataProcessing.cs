@@ -126,6 +126,8 @@ namespace Px86.NintendoDS.Common.Cpu.Arm
                     if (flags) cpu.SetNZC(result, carry);
                     break;
                 case OP_MOV:
+                    if (op == 0xE1A0C00Cu)
+                        cpu.NoCashMessage?.Invoke(cpu); // mov r12,r12: debug message marker
                     result = operand2;
                     if (flags) cpu.SetNZC(result, carry);
                     break;

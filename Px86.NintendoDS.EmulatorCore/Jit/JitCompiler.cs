@@ -500,6 +500,8 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
                 int rn = (int)(op >> 16) & 0xF;
                 int rd = (int)(op >> 12) & 0xF;
                 bool compare = opcode is >= 8 and <= 11;
+                if (op == 0xE1A0C00Cu)
+                    return false; // mov r12,r12: the handler prints the debug message
                 if (rd == 15 && !compare)
                     return false; // writes PC
                 bool logical = opcode is 0 or 1 or 8 or 9 or >= 12;
@@ -687,7 +689,7 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
                         int rd = (int)(op & 7) | (int)((op >> 4) & 8);
                         int rs = (int)((op >> 3) & 0xF);
                         uint kind = (op >> 8) & 3;
-                        if (kind == 3 || (rd == 15 && kind != 1))
+                        if (kind == 3 || (rd == 15 && kind != 1) || op == 0x46E4)
                             return false; // BX/BLX, PC writes
                         _il.Emit(OpCodes.Ldarg, ArgCpu);
                         _il.Emit(OpCodes.Ldc_I4, rd);

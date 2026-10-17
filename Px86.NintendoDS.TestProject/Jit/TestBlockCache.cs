@@ -38,6 +38,7 @@ namespace Px86.NintendoDS.TestProject.Jit
         [DataRow("sound", 20)]
         [DataRow("touch", 10)]
         [DataRow("bench", 20)]
+        [DataRow("debugmsg", 5)]
         public void CachedRunsMatchTheInterpreter(string rom, int frames) => Lockstep(rom, frames, CpuMode.Cached);
 
         [DataTestMethod]
@@ -48,6 +49,7 @@ namespace Px86.NintendoDS.TestProject.Jit
         [DataRow("sound", 20)]
         [DataRow("touch", 10)]
         [DataRow("bench", 20)]
+        [DataRow("debugmsg", 5)]
         public void JitRunsMatchTheInterpreter(string rom, int frames)
         {
             var jit = Lockstep(rom, frames, CpuMode.Jit);

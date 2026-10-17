@@ -56,6 +56,7 @@ namespace Px86.NintendoDS.Emulator
         private DebuggerWindow? _debugger;
         private MemoryWindow? _memory;
         private IoWindow? _io;
+        private LogWindow? _log;
         private VideoWindow? _video;
         private ScreenLayout _layout;
         private bool _touching;
@@ -212,11 +213,13 @@ namespace Px86.NintendoDS.Emulator
             _debugger = new DebuggerWindow(_ui);
             _memory = new MemoryWindow(_ui);
             _io = new IoWindow(_ui);
+            _log = new LogWindow(_ui);
             _video = new VideoWindow(_ui, _gl);
             _menu.ToolItems.Add(("Debugger...", "Ctrl+D", _debugger.Open));
             _menu.ToolItems.Add(("Memory...", "Ctrl+M", _memory.Open));
             _menu.ToolItems.Add(("I/O registers...", null, _io.Open));
             _menu.ToolItems.Add(("Video viewers...", null, _video.Open));
+            _menu.ToolItems.Add(("Log...", "Ctrl+L", _log.Open));
             _host.BreakHit += OnBreakHit;
 
             foreach (var keyboard in _inputContext.Keyboards)
@@ -255,6 +258,7 @@ namespace Px86.NintendoDS.Emulator
                     case Key.C when !ImGui.GetIO().WantTextInput: _cheatsWindow!.Open(); return;
                     case Key.D: _debugger!.Open(); return;
                     case Key.M: _memory!.Open(); return;
+                    case Key.L: _log!.Open(); return;
                 }
             }
 
@@ -393,6 +397,8 @@ namespace Px86.NintendoDS.Emulator
             _debugger!.Draw();
             _memory!.Draw();
             _io!.Draw();
+            _log!.Poll();
+            _log.Draw();
             _video!.Draw();
             _browser.Draw();
             _notifications.Draw();
