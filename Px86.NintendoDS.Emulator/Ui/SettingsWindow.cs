@@ -269,10 +269,11 @@ namespace Px86.NintendoDS.Emulator.Ui
                 s.CpuMode = (CpuMode)mode;
                 _ui.Host.Invoke(() => { if (_ui.Host.Emulator is { } nds) nds.CpuMode = s.CpuMode; });
             }
-            ImGui.TextDisabled("Cached decodes runs of code once. Results are identical; the debugger always interprets.");
+            ImGui.TextDisabled("JIT compiles hot code to native code (about 2x faster). All modes give identical results;");
+            ImGui.TextDisabled("the debugger always interprets. Switch to Interpreter if a game misbehaves only with the JIT.");
         }
 
-        private static readonly string[] CpuModes = { "Interpreter", "Cached" };
+        private static readonly string[] CpuModes = { "Interpreter", "Cached", "JIT" };
 
         private void RemoteTab()
         {

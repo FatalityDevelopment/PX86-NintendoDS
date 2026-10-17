@@ -135,6 +135,9 @@ namespace Px86.NintendoDS.EmulatorCore
 
         /// <summary>Number of blocks built so far (both CPUs), for diagnostics.</summary>
         public long BlocksCompiled => _blocks9.Compiles + _blocks7.Compiles;
+
+        /// <summary>Blocks compiled to native code (JIT mode).</summary>
+        public long JitCompiles { get; private set; }
         public ArmCpu Arm9 { get; }
         public ArmCpu Arm7 { get; }
         public Cp15 Cp15 { get; }
@@ -490,7 +493,7 @@ namespace Px86.NintendoDS.EmulatorCore
                 target = Scheduler.Now + 1;
             var debug = _debugger;
 
-            bool cached = CpuMode == CpuMode.Cached && debug == null;
+            bool cached = CpuMode != CpuMode.Interpreter && debug == null;
 
             // ARM9
             WakeIfPending(Arm9, Irq9);
@@ -558,6 +561,25 @@ namespace Px86.NintendoDS.EmulatorCore
         /// </summary>
         private long RunBlock(ArmCpu cpu, CachedBlock block, long time, long target, DmaController dma, int clock)
         {
+            if (block.Compiled != null)
+                return block.Compiled(cpu, block, Scheduler, dma, time, target);
+            if (CpuMode == CpuMode.Jit && !block.NoJit && ++block.Runs >= CachedBlock.JitThreshold)
+            {
+                // A compiler bug must not stop the game: such a block stays interpreted.
+                // Invalid IL is reported on the first call, before any instruction runs.
+                try
+                {
+                    var compiled = JitCompiler.Compile(block, clock);
+                    long end = compiled(cpu, block, Scheduler, dma, time, target);
+                    block.Compiled = compiled;
+                    JitCompiles++;
+                    return end;
+                }
+                catch (InvalidProgramException)
+                {
+                    block.NoJit = true;
+                }
+            }
             uint expected = block.Address;
             uint size = block.Thumb ? 2u : 4u;
             var opcodes = block.Opcodes;

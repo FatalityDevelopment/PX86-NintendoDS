@@ -1,3 +1,4 @@
+using Px86.NintendoDS.EmulatorCore.Jit;
 using Px86.NintendoDS.EmulatorCore.Cartridge;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
 using Px86.NintendoDS.FileFormats.Rom;
@@ -16,6 +17,9 @@ namespace Px86.NintendoDS.EmulatorCore
 
         /// <summary>Nickname, birthday, language… for the generated firmware (ignored when a firmware dump is given).</summary>
         public FirmwareFlash.UserProfile? Profile { get; init; }
+
+        /// <summary>How the CPUs run code (the debugger always interprets).</summary>
+        public CpuMode CpuMode { get; init; } = CpuMode.Interpreter;
     }
 
     /// <summary>
@@ -49,7 +53,7 @@ namespace Px86.NintendoDS.EmulatorCore
 
         public static GameSession Start(GameLoadOptions options)
         {
-            var emulator = new NdsEmulator();
+            var emulator = new NdsEmulator { CpuMode = options.CpuMode };
             var rom = NdsRom.Load(options.RomPath);
             var session = new GameSession(emulator, rom, new SaveMemory(), options.RomPath,
                 options.SavePath ?? Path.ChangeExtension(options.RomPath, ".sav"));

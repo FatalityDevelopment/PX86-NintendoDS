@@ -31,6 +31,7 @@ namespace Px86.NintendoDS.Emulator
             Bios7Path = NullIfEmpty(_settings.Bios7Path),
             FirmwarePath = NullIfEmpty(_settings.FirmwarePath),
             UseRealBios = _settings.UseRealBios,
+            CpuMode = _settings.CpuMode,
             Profile = new FirmwareFlash.UserProfile
             {
                 Nickname = string.IsNullOrWhiteSpace(_settings.Nickname) ? "Px86" : _settings.Nickname,
@@ -48,7 +49,6 @@ namespace Px86.NintendoDS.Emulator
             var session = Start(OptionsFor(romPath, savePath));
             if (session == null)
                 return false;
-            session.Emulator.CpuMode = _settings.CpuMode;
             _host.Attach(session);
             _settings.AddRecentRom(romPath);
             TrySaveSettings();

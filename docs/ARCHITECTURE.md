@@ -49,6 +49,28 @@
 While a CPU runs, `Scheduler.CurrentTime` holds its exact position, so timers read correct counters and devices can schedule
 work relative to "now". DMA transfers run to completion when they trigger, and their cost is charged to the CPU that owns them.
 
+## CPU modes and the JIT (`EmulatorCore/Jit/`)
+
+`NdsEmulator.CpuMode` picks how step 2/3 run code. All three give bit-identical results (same registers, memory and cycle
+counts), checked by lockstep tests on every test ROM and on random code. Any debugger forces the interpreter.
+
+- **Interpreter**: `ArmCpu.Step` fetches and decodes every instruction.
+- **Cached**: `BlockCache` decodes a straight run of up to 64 instructions inside one 256-byte page once. It ends at an
+  unconditional jump or the page end.
+- **JIT**: a block entered 32 times is compiled by `JitCompiler` into a `DynamicMethod`, which .NET turns into native code.
+  - **Inlined**: ALU ops, B/BL and single loads/stores. They are emitted as calls to the small `JitOps` methods with
+    constant operands, which .NET inlines.
+  - **Everything else**: a direct call to the interpreter's handler.
+  - **Exit checks**: after each instruction the block stops exactly where the interpreter loop would — at the slice end,
+    and, after memory or handler instructions, on a jump, halt, pending IRQ, an overwrite of its own code, or an ARM/Thumb
+    switch.
+  - **State**: PC, R15 and the cycle counter are written back when the block exits (`ArmCpu.JitRetire`).
+  - **Compile failure**: if a block's code can't be compiled, it is interpreted instead.
+
+`CodeTracker` invalidates blocks when their bytes are written by the CPU, DMA or the cartridge. Invalidation is per block, so a
+variable that shares a page with code doesn't throw that code away. TCM moves, WRAM remaps, reset and state loads flush
+everything.
+
 ## Boot
 
 - **Direct boot** (`DirectBoot.Apply`): copies the binaries and header, writes the boot info and firmware user settings to RAM,

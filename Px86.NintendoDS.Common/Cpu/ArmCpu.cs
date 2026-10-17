@@ -220,6 +220,7 @@ namespace Px86.NintendoDS.Common.Cpu
             {
                 Halted = false;
                 RaiseException(ProcessorMode.Irq, VECTOR_IRQ, _pc + 4, disableFiq: false);
+                Branched = false; // the jump is complete; the next instruction must advance PC normally
                 TotalCycles += 3;
                 return 3;
             }
@@ -296,6 +297,40 @@ namespace Px86.NintendoDS.Common.Cpu
             TotalCycles += _cycles;
             return _cycles;
         }
+
+        // ── JIT support ───────────────────────────────────────────────────────
+        // Compiled blocks run several instructions without the per-instruction
+        // bookkeeping above; these bring the core back to exactly the state the
+        // interpreter would be in.
+
+        /// <summary>Start a handler call from compiled code: PC = <paramref name="pc"/>, R15 = PC + 8 / + 4.</summary>
+        public void JitBegin(uint pc)
+        {
+            _cycles = 1;
+            _pc = pc;
+            R[15] = pc + ((_cpsr & FLAG_T) != 0 ? 4u : 8u);
+        }
+
+        /// <summary>Finish a handler call started by <see cref="JitBegin"/>; returns its cycles.</summary>
+        public int JitEnd(uint next)
+        {
+            if (!Branched)
+                _pc = next;
+            Branched = false;
+            TotalCycles += _cycles;
+            return _cycles;
+        }
+
+        /// <summary>Leave compiled code after inlined instructions: next PC, the R15 the last one saw, their cycles.</summary>
+        public void JitRetire(uint next, uint r15, int cycles)
+        {
+            _pc = next;
+            R[15] = r15;
+            TotalCycles += cycles;
+        }
+
+        /// <summary>Leave compiled code after a handler call (PC and R15 are already right).</summary>
+        public void JitAddCycles(int cycles) => TotalCycles += cycles;
 
         /// <summary>True when the next <see cref="Step"/> would take an IRQ.</summary>
         public bool IrqPending => IrqLine && (_cpsr & FLAG_I) == 0;

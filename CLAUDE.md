@@ -88,6 +88,8 @@ or `xvfb-run` to run the real window, and read the PNG to check rendering.
 - An ARM decode index is `(op >> 16 & 0xFF0) | (op >> 4 & 0xF)`. A Thumb index is `op >> 6`.
 - SWI numbers: ARM = bits 23–16, Thumb = bits 7–0. `SwiHandler` (HLE) returns true when it handled the call.
 - Test opcodes come from `llvm-mc -triple=armv5te -show-encoding` (or `thumbv5te`). Don't hand-encode them.
+- The JIT (`EmulatorCore/Jit/JitCompiler.cs` + `Common/Cpu/JitOps.cs`) must match the interpreter bit for bit. When you
+  change a handler's behaviour or cycles, change its inlined twin too. `TestProject/Jit/` compares the two in lockstep.
 
 ### Timing and the main loop
 

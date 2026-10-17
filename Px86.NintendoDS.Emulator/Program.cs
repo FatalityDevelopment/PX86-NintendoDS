@@ -48,6 +48,7 @@ namespace Px86.NintendoDS.Emulator
             if (cl.Bios7Path != null) settings.Bios7Path = cl.Bios7Path;
             if (cl.FirmwarePath != null) settings.FirmwarePath = cl.FirmwarePath;
             if (cl.RealBios) settings.UseRealBios = true;
+            if (cl.CpuMode is { } cpuMode) settings.CpuMode = cpuMode;
             if (cl.Scale is int scale) settings.Scale = Math.Clamp(scale, 1, 8);
             if (cl.SaveSettings) settings.Save();
 

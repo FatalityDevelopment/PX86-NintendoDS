@@ -1,3 +1,5 @@
+using Px86.NintendoDS.EmulatorCore.Jit;
+
 namespace Px86.NintendoDS.Emulator
 {
     /// <summary>
@@ -21,6 +23,7 @@ namespace Px86.NintendoDS.Emulator
     ///     --gs-codec &lt;c&gt;        jpeg (default), png or raw
     ///     --gs-quality &lt;n&gt;      JPEG quality 1–100 (default 85)
     ///     --paused              Start paused (set breakpoints first, then resume over PINE)
+    ///     --cpu &lt;mode&gt;          interpreter, cached or jit
     ///     --trace-io            Log unhandled I/O register accesses
     ///     --save-settings       Store the given BIOS/firmware/scale options as defaults
     /// </summary>
@@ -44,6 +47,7 @@ namespace Px86.NintendoDS.Emulator
         public string? GsCodec { get; private set; }
         public int? GsQuality { get; private set; }
         public bool Paused { get; private set; }
+        public CpuMode? CpuMode { get; private set; }
         public string? ReplayGxPath { get; private set; }
 
         /// <summary>Headless without a fixed frame count: keep running and serve PINE/GS.</summary>
@@ -89,6 +93,16 @@ namespace Px86.NintendoDS.Emulator
                     case "--gs-codec": cl.GsCodec = Next(); break;
                     case "--gs-quality": cl.GsQuality = int.Parse(Next()); break;
                     case "--paused": cl.Paused = true; break;
+                    case "--cpu":
+                        string mode = Next();
+                        cl.CpuMode = mode.ToLowerInvariant() switch
+                        {
+                            "interpreter" or "interp" => Px86.NintendoDS.EmulatorCore.Jit.CpuMode.Interpreter,
+                            "cached" => Px86.NintendoDS.EmulatorCore.Jit.CpuMode.Cached,
+                            "jit" => Px86.NintendoDS.EmulatorCore.Jit.CpuMode.Jit,
+                            _ => throw new ArgumentException($"--cpu: unknown mode {mode} (interpreter, cached or jit)."),
+                        };
+                        break;
                     case "--replay-gx": cl.ReplayGxPath = Next(); break;
                     case "--save-settings": cl.SaveSettings = true; break;
                     case "-h":
@@ -101,11 +115,13 @@ namespace Px86.NintendoDS.Emulator
                 }
             }
 
+            // Developer defaults: only used on the machine where these files exist.
             var resources = @"C:\Users\tholu\Desktop\Px86-NintendoDS\resources";
-            cl.Bios9Path = cl.Bios9Path ?? @$"{resources}\bios\bios9.bin";
-            cl.Bios7Path = cl.Bios7Path ?? @$"{resources}\bios\bios7.bin";
-            cl.FirmwarePath = cl.FirmwarePath ?? @$"{resources}\bios\firmware.bin";
-            cl.RomPath = cl.RomPath ?? $@"{resources}\roms\Pokemon - Platinum Version (USA) (Rev 1).nds";
+            static string? IfExists(string path) => File.Exists(path) ? path : null;
+            cl.Bios9Path ??= IfExists(@$"{resources}\bios\bios9.bin");
+            cl.Bios7Path ??= IfExists(@$"{resources}\bios\bios7.bin");
+            cl.FirmwarePath ??= IfExists(@$"{resources}\bios\firmware.bin");
+            cl.RomPath ??= IfExists($@"{resources}\roms\Pokemon - Platinum Version (USA) (Rev 1).nds");
 
             return cl;
         }
@@ -133,6 +149,7 @@ namespace Px86.NintendoDS.Emulator
               --gs-codec <c>        GS stream format: jpeg (default), png or raw
               --gs-quality <n>      GS stream JPEG quality 1-100 (default 85)
               --paused              Start paused (resume over PINE or with P)
+              --cpu <mode>          interpreter, cached or jit (default: jit, from settings)
               --replay-gx <file>    Re-render a GX capture (F9) to --screenshot (or <file>.png)
                                     and write a polygon/command dump to <file>.txt
               --trace-io            Log unhandled I/O register accesses
