@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Px86.NintendoDS.EmulatorCore</RootNamespace>
+    <AssemblyName>Px86.NintendoDS.EmulatorCore</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Px86.NintendoDS.Common\Px86.NintendoDS.Common.csproj" />
+    <ProjectReference Include="..\Px86.NintendoDS.FileFormats\Px86.NintendoDS.FileFormats.csproj" />
+  </ItemGroup>
+
+</Project>

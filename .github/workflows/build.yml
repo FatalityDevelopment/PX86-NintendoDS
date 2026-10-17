@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Reject committed build outputs
+        shell: bash
+        run: |
+          if git ls-files | grep -iE '(^|/)(bin|obj)/'; then
+            echo "::error::Build outputs (bin/ or obj/) are committed. Remove them."
+            exit 1
+          fi
+
+      - name: Restore
+        run: dotnet restore Px86.NintendoDS.sln
+
+      - name: Build
+        run: dotnet build Px86.NintendoDS.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Px86.NintendoDS.TestProject/Px86.NintendoDS.TestProject.csproj -c Release --no-build --verbosity normal
+
+      - name: Publish emulator
+        run: dotnet publish Px86.NintendoDS.Emulator/Px86.NintendoDS.Emulator.csproj -c Release -o publish/Px86.NintendoDS.Emulator --no-build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Px86.NintendoDS-${{ matrix.os }}
+          path: publish/
