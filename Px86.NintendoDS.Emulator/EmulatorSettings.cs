@@ -75,6 +75,9 @@ namespace Px86.NintendoDS.Emulator
             RomFolder = Path.GetDirectoryName(path);
         }
 
+        /// <summary>Last usrcheat.dat imported from (Tools → Cheats).</summary>
+        public string? CheatDatabasePath { get; set; }
+
         // ── Generated firmware (used when no firmware dump is configured) ─────
 
         public string Nickname { get; set; } = "Px86";

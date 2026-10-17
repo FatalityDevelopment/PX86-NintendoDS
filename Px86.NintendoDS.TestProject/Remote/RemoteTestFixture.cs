@@ -16,7 +16,7 @@ namespace Px86.NintendoDS.TestProject.Remote
             Directory.CreateDirectory(_folder);
             RomPath = Path.Combine(_folder, rom + ".nds");
             File.Copy(Path.Combine(AppContext.BaseDirectory, "TestRoms", rom + ".nds"), RomPath);
-            Host = new EmulatorHost { Limiter = LimiterMode.Unlimited };
+            Host = new EmulatorHost { Limiter = LimiterMode.Unlimited, CheatFolder = Path.Combine(_folder, "cheats") };
             Host.LoadGame(new GameLoadOptions { RomPath = RomPath });
             Host.Start(paused);
         }

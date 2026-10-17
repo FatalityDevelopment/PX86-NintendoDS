@@ -617,6 +617,57 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                     _host.LoadGame(LoadOptions(path));
                     return true;
                 }
+                // ── Cheats ────────────────────────────────────────────────────
+                case PineOpcodes.CheatList:
+                {
+                    var cheats = _host.Cheats.Cheats;
+                    rp.U32((uint)cheats.Count);
+                    foreach (var c in cheats)
+                    {
+                        var name = Encoding.UTF8.GetBytes(c.Name);
+                        if (name.Length > 255) name = name[..255];
+                        rp.U8(c.Enabled ? (byte)1 : (byte)0);
+                        rp.U8((byte)c.Type);
+                        rp.U8((byte)name.Length);
+                        rp.Raw(name);
+                    }
+                    return true;
+                }
+                case PineOpcodes.CheatAdd:
+                {
+                    byte type = rq.U8();
+                    bool enabled = rq.U8() != 0;
+                    string name = rq.Utf8(rq.U16());
+                    string code = rq.Utf8(rq.U16());
+                    if (type > 1) return false;
+                    var cheat = new EmulatorCore.Cheats.Cheat { Name = name, Code = code, Type = (EmulatorCore.Cheats.CheatType)type, Enabled = enabled };
+                    if (cheat.Validate() is { } error)
+                    {
+                        Log?.Invoke($"[PINE] cheat '{name}' rejected: {error}");
+                        return false;
+                    }
+                    int index = -1;
+                    if (!_host.EditCheats(list => { list.Cheats.Add(cheat); index = list.Cheats.Count - 1; }))
+                        return false;
+                    rp.U32((uint)index);
+                    return true;
+                }
+                case PineOpcodes.CheatEnable:
+                {
+                    uint index = rq.U32();
+                    bool enabled = rq.U8() != 0;
+                    if (index >= _host.Cheats.Cheats.Count) return false;
+                    return _host.EditCheats(list => list.Cheats[(int)index].Enabled = enabled);
+                }
+                case PineOpcodes.CheatRemove:
+                {
+                    uint index = rq.U32();
+                    if (index >= _host.Cheats.Cheats.Count) return false;
+                    return _host.EditCheats(list => list.Cheats.RemoveAt((int)index));
+                }
+                case PineOpcodes.CheatClear:
+                    return _host.EditCheats(list => list.Cheats.Clear());
+
                 case PineOpcodes.CaptureGx:
                 {
                     string path = rq.Utf8(rq.U16());

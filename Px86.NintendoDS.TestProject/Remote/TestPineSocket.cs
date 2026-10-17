@@ -223,5 +223,35 @@ namespace Px86.NintendoDS.TestProject.Remote
                 Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.SaveState, (byte)2), Cmd(PineOpcodes.LoadState, (byte)2))[4], "slot save + load");
             }
         }
+
+        [TestMethod]
+        public void CheatOpcodesManageTheList()
+        {
+            var (f, pine, c) = Start();
+            using (f) using (pine) using (c)
+            {
+                WaitForDone(f);
+                var add = c.Send(Cmd(PineOpcodes.CheatAdd, (byte)0, (byte)1, "Value", "023F0000 0000BEEF"));
+                Assert.AreEqual(Ok, add[4], "add AR cheat");
+                Assert.AreEqual(0u, U32(add, 5), "index 0");
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.CheatAdd, (byte)0, (byte)1, "Bad", "zzz"))[4], "invalid code rejected");
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.CheatAdd, (byte)1, (byte)0, "Raw", "023F0010 12"))[4], "add raw cheat, disabled");
+
+                var list = c.Send(Cmd(PineOpcodes.CheatList));
+                Assert.AreEqual(2u, U32(list, 5), "two cheats");
+                Assert.AreEqual(1, list[9], "first enabled");
+                Assert.AreEqual("Value", System.Text.Encoding.UTF8.GetString(list, 12, list[11]), "first name");
+
+                f.WaitFor(() => f.Host.Emulator!.Arm9Bus.BusRead32(0x023F0000) == 0xBEEF, "the cheat to apply");
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.CheatEnable, 1u, (byte)1))[4], "enable the raw cheat");
+                f.WaitFor(() => f.Host.Emulator!.Arm9Bus.BusRead8(0x023F0010) == 0x12, "the raw cheat to apply");
+
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.CheatRemove, 0u))[4], "remove");
+                Assert.AreEqual(1u, U32(c.Send(Cmd(PineOpcodes.CheatList)), 5), "one left");
+                Assert.IsTrue(File.Exists(Path.Combine(f.Folder, "cheats", EmulatorCore.Cheats.CheatList.GameId(f.Host.Emulator!.Rom!) + ".json")), "list saved per game");
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.CheatClear))[4], "clear");
+                Assert.AreEqual(0u, U32(c.Send(Cmd(PineOpcodes.CheatList)), 5), "empty");
+            }
+        }
     }
 }

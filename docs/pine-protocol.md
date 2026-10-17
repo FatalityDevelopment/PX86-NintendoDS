@@ -147,6 +147,11 @@ Notes on specific opcodes:
 | 65 | LoadRom | len u16, UTF-8 path | — (starts it with the configured BIOS/firmware) |
 | 66 | GetBreakInfo | — | valid u8, cpu u8, reason u8 (0 breakpoint, 1 watchpoint), pc u32, addr u32, write u8 |
 | 67 | Shutdown | — | — (headless server exits, window closes) |
+| 68 | CheatList | — | count u32, then {enabled u8, type u8 (0 AR, 1 raw), name length u8, UTF-8 name} |
+| 69 | CheatAdd | type u8, enabled u8, name len u16 + UTF-8, code len u16 + UTF-8 | index u32 (FAIL if the code doesn't parse) |
+| 6A | CheatEnable | index u32, enabled u8 | — |
+| 6B | CheatRemove | index u32 | — |
+| 6C | CheatClear | — | — |
 | 6F | CaptureGx | len u16, UTF-8 path | — (records the next 3D frame to a `.gxcap` file; see the emulator guide) |
 
 ## GS stream format

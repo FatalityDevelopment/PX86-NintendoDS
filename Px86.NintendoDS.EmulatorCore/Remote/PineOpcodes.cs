@@ -88,6 +88,11 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
         public const byte LoadRom = 0x65;
         public const byte GetBreakInfo = 0x66;
         public const byte Shutdown = 0x67;
+        public const byte CheatList = 0x68;
+        public const byte CheatAdd = 0x69;
+        public const byte CheatEnable = 0x6A;
+        public const byte CheatRemove = 0x6B;
+        public const byte CheatClear = 0x6C;
         public const byte CaptureGx = 0x6F;
 
         // ── Result codes ──────────────────────────────────────────────────────

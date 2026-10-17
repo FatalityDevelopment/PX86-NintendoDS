@@ -47,6 +47,8 @@ namespace Px86.NintendoDS.Emulator
         private UiContext? _ui;
         private MainMenu? _menu;
         private SettingsWindow? _settingsWindow;
+        private CheatsWindow? _cheatsWindow;
+        private CheatSearchWindow? _searchWindow;
         private ScreenLayout _layout;
         private bool _touching;
         private readonly Stopwatch _titleTimer = Stopwatch.StartNew();
@@ -170,6 +172,11 @@ namespace Px86.NintendoDS.Emulator
             };
             _settingsWindow = new SettingsWindow(_ui);
             _menu = new MainMenu(_ui, _settingsWindow);
+            _cheatsWindow = new CheatsWindow(_ui);
+            _searchWindow = new CheatSearchWindow(_ui, _cheatsWindow);
+            _menu.ToolItems.Add(("Cheats...", "Ctrl+C", _cheatsWindow.Open));
+            _menu.ToolItems.Add(("Cheat search...", null, _searchWindow.Open));
+            _host.CheatFailed += (name, error) => _notifications.Add($"Cheat '{name}' switched off: {error}");
 
             foreach (var keyboard in _inputContext.Keyboards)
             {
@@ -204,6 +211,7 @@ namespace Px86.NintendoDS.Emulator
                     case Key.Q: _window.Close(); return;
                     case Key.R: _host.Reset(); _notifications.Add("Reset"); return;
                     case Key.Comma: _settingsWindow.Open(); return;
+                    case Key.C when !ImGui.GetIO().WantTextInput: _cheatsWindow!.Open(); return;
                 }
             }
 
@@ -326,6 +334,8 @@ namespace Px86.NintendoDS.Emulator
             _imgui!.Update((float)delta);
             _menu!.Draw();
             _settingsWindow!.Draw();
+            _cheatsWindow!.Draw();
+            _searchWindow!.Draw();
             _browser.Draw();
             _notifications.Draw();
 

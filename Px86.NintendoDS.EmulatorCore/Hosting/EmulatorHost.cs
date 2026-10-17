@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Px86.NintendoDS.Common.Cpu;
+using Px86.NintendoDS.EmulatorCore.Cheats;
 using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Video;
@@ -105,6 +106,15 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
         /// <summary>The most recent breakpoint or watchpoint hit.</summary>
         public BreakInfo? LastBreak { get; private set; }
 
+        /// <summary>The running game's cheats (empty without a game). Change them inside <see cref="EditCheats"/>.</summary>
+        public CheatList Cheats { get; private set; } = new();
+
+        /// <summary>Folder for per-game cheat files (default: the user's app-data folder).</summary>
+        public string? CheatFolder { get; set; }
+
+        /// <summary>A cheat failed to parse and was switched off (name, error).</summary>
+        public event Action<string, string>? CheatFailed;
+
         /// <summary>The host's own input (keyboard, gamepad, mouse). Polled before every chunk.</summary>
         public Func<InputState>? LocalInput { get; set; }
 
@@ -205,6 +215,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
                     Session.Dispose();
                 }
                 Session = session;
+                LoadCheats(session);
                 session.Emulator.Debugger = Debugger;
                 session.Emulator.FrameCompleted += OnEmulatorFrame;
                 Debugger.PendingBreak = null;
@@ -225,6 +236,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
                 Session.Emulator.Debugger = null;
                 Session.Dispose();
                 Session = null;
+                Cheats = new CheatList();
                 Debugger.PendingBreak = null;
                 _framesToAdvance = 0;
             });
@@ -387,6 +399,39 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
 
         public bool LoadStateFile(string path) => Invoke(() => Session?.LoadStateFile(path) ?? false);
 
+        // ── Cheats ────────────────────────────────────────────────────────────
+
+        private void LoadCheats(GameSession session)
+        {
+            try
+            {
+                Cheats = CheatList.Load(CheatList.PathFor(session.Rom, CheatFolder));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            {
+                Console.Error.WriteLine($"[Cheats] could not load the cheat list: {ex.Message}");
+                Cheats = new CheatList();
+            }
+            Cheats.CheatFailed += (cheat, error) => CheatFailed?.Invoke(cheat.Name, error);
+        }
+
+        /// <summary>Change the cheat list safely (between slices) and save it. False without a game.</summary>
+        public bool EditCheats(Action<CheatList> edit) => Invoke(() =>
+        {
+            if (Session == null)
+                return false;
+            edit(Cheats);
+            try
+            {
+                Cheats.Save(CheatList.PathFor(Session.Rom, CheatFolder));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"[Cheats] could not save the cheat list: {ex.Message}");
+            }
+            return true;
+        });
+
         // ── GX capture ────────────────────────────────────────────────────────
 
         /// <summary>
@@ -481,6 +526,8 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
         private void OnEmulatorFrame()
         {
             var nds = Session!.Emulator;
+            if (Cheats.Cheats.Count > 0)
+                Cheats.Apply(new EmulatorCheatMemory(nds)); // once per frame, at VBlank, like an Action Replay
             ScreenCapture.Compose(nds, _frame);
             FrameReady?.Invoke(_frame, nds.FrameCount);
             FrameEnded?.Invoke(nds);

@@ -22,7 +22,7 @@ The menu bar sits at the top of the window. Esc hides it, for example in fullscr
 | File | Open ROM, Recent, Close ROM, Save/Load state (slots 0–9 with times, or any file), Screenshot, GX capture, Exit |
 | Emulation | Pause/Resume, Frame advance, Reset, Speed (normal, turbo, slow motion, unlimited) |
 | Config | Settings…, screen layout, swap screens, smooth filtering, fullscreen |
-| Tools | PINE socket and GS frame stream on/off (for CodeDesigner) |
+| Tools | Cheats (Ctrl+C), Cheat search, PINE socket and GS frame stream on/off (for CodeDesigner) |
 | Help | Controls, About |
 
 **Config → Settings** (Ctrl+,) has these tabs. Settings are saved when the window closes.
@@ -99,6 +99,29 @@ game saves. An existing `.sav` file determines the type from its size, so saves 
   "KeyBindings": { "Up": "Up", "X": "A", "Z": "B", "...": "..." }
 }
 ```
+
+## Cheats
+
+**Tools → Cheats** (Ctrl+C) lists the running game's cheats. Tick a cheat to turn it on. Enabled cheats run once
+per frame, as on a real Action Replay. The list is saved per game in the settings folder under
+`cheats/<GAMECODE>-<CRC32>.json`.
+
+- **Action Replay DS** codes: one `XXXXXXXX YYYYYYYY` pair per line. The whole opcode set is supported: writes,
+  conditionals, pointers, loops, the data register, and block copies (see GBATEK "DS Cart Cheat Action Replay DS").
+  `;`, `#` and `//` start comments, and dashes are ignored.
+- **Raw** codes: one `ADDRESS VALUE` write per line, re-applied every frame. The number of value digits sets the size:
+  2 for a byte, 4 for a halfword, 8 for a word.
+- **Import from usrcheat.dat** reads R4/DeSmuME cheat databases, including scrambled ones. It finds the game by game
+  code and header CRC, and lets you pick which cheats to add. Imported cheats start switched off.
+
+A code that doesn't parse is switched off, with a message saying why.
+
+**Tools → Cheat search** finds where a value lives in main RAM:
+1. Choose the value size and start a search.
+2. Play until the value changes, then filter with a comparison: `=`, `!=`, `<` and `>` against a value, or changed,
+   unchanged, increased, decreased, or changed by a given amount since the last scan.
+3. Repeat until only a few addresses are left.
+4. **Make cheat** turns one of them into a raw cheat that holds the value.
 
 ## Reporting 3D glitches (GX capture)
 
