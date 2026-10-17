@@ -7,6 +7,7 @@ using Px86.NintendoDS.EmulatorCore.Cartridge;
 using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
+using Px86.NintendoDS.EmulatorCore.Hardware.Wifi;
 using Px86.NintendoDS.EmulatorCore.Jit;
 using Px86.NintendoDS.EmulatorCore.Video;
 using Px86.NintendoDS.EmulatorCore.Video.Gpu3D;
@@ -84,6 +85,7 @@ namespace Px86.NintendoDS.EmulatorCore
             Rtc = new RealTimeClock();
             Control = new SystemControl();
             Spi = new SpiBus(Irq7, new PowerManager(), FirmwareFlash.CreateDefault(), new TouchScreen());
+            Wifi = new WifiController(Scheduler, Irq7);
             Cartridge = new CartridgeSlot(Scheduler, Irq9, Irq7, Dma9, Dma7);
             Lcd = new LcdController(Scheduler, Irq9, Irq7, Dma9, Dma7);
             EngineA = new Gpu2DEngine(true, Vram, Palette, Oam);
@@ -165,6 +167,9 @@ namespace Px86.NintendoDS.EmulatorCore
         public RealTimeClock Rtc { get; }
         public SystemControl Control { get; }
         public SpiBus Spi { get; }
+
+        /// <summary>The ARM7's Wifi hardware; set <see cref="WifiController.Medium"/> to connect it.</summary>
+        public WifiController Wifi { get; }
         public CartridgeSlot Cartridge { get; }
         public LcdController Lcd { get; }
         public Gpu2DEngine EngineA { get; }
@@ -248,6 +253,9 @@ namespace Px86.NintendoDS.EmulatorCore
             Rtc.Reset();
             Control.Reset();
             Spi.Reset();
+            // The firmware's RF type tells which console it came from: 2 = DS (MM3155 + RF9008), 3 = DS-Lite.
+            Wifi.ChipId = Spi.Firmware.Data[0x40] == 2 ? (ushort)0x1440 : (ushort)0xC340;
+            Wifi.Reset();
             Cartridge.Reset();
             EngineA.Reset();
             EngineB.Reset();
@@ -286,7 +294,7 @@ namespace Px86.NintendoDS.EmulatorCore
         // ── Save states ───────────────────────────────────────────────────────
 
         public const string StateMagic = "PX86-NDS-STATE";
-        public const int StateVersion = 1;
+        public const int StateVersion = 2;
 
         /// <summary>Write the complete machine state (memory, CPUs, every device) to <paramref name="stream"/>.</summary>
         public void SaveState(Stream stream) => SerializeState(StateSerializer.ForWriting(stream));
@@ -354,6 +362,7 @@ namespace Px86.NintendoDS.EmulatorCore
             Rtc.Serialize(s);
             Control.Serialize(s);
             Spi.Serialize(s);
+            Wifi.Serialize(s);
             Cartridge.Serialize(s);
             Lcd.Serialize(s);
             EngineA.Serialize(s);
