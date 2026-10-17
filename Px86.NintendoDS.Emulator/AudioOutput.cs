@@ -19,12 +19,10 @@ namespace Px86.NintendoDS.Emulator
         private readonly Context* _context;
         private readonly uint _source;
         private readonly Queue<uint> _freeBuffers = new();
-        private readonly NdsEmulator _nds;
         private readonly short[] _samples = new short[8192];
 
-        private AudioOutput(NdsEmulator nds, AL al, ALContext alc, Device* device, Context* context)
+        private AudioOutput(AL al, ALContext alc, Device* device, Context* context)
         {
-            _nds = nds;
             _al = al;
             _alc = alc;
             _device = device;
@@ -34,7 +32,7 @@ namespace Px86.NintendoDS.Emulator
                 _freeBuffers.Enqueue(buffer);
         }
 
-        public static AudioOutput? TryCreate(NdsEmulator nds)
+        public static AudioOutput? TryCreate()
         {
             try
             {
@@ -45,7 +43,7 @@ namespace Px86.NintendoDS.Emulator
                     return null;
                 Context* context = alc.CreateContext(device, null);
                 alc.MakeContextCurrent(context);
-                return new AudioOutput(nds, al, alc, device, context);
+                return new AudioOutput(al, alc, device, context);
             }
             catch (Exception ex) when (ex is DllNotFoundException or InvalidOperationException or FileNotFoundException)
             {
@@ -54,8 +52,11 @@ namespace Px86.NintendoDS.Emulator
             }
         }
 
+        /// <summary>Output volume, 0–1.</summary>
+        public void SetVolume(float volume) => _al.SetSourceProperty(_source, SourceFloat.Gain, Math.Clamp(volume, 0f, 1f));
+
         /// <summary>Emulation thread, after each frame: move new samples into OpenAL.</summary>
-        public void OnFrame()
+        public void OnFrame(NdsEmulator nds)
         {
             _al.GetSourceProperty(_source, GetSourceInteger.BuffersProcessed, out int processed);
             if (processed > 0)
@@ -69,18 +70,18 @@ namespace Px86.NintendoDS.Emulator
 
             while (_freeBuffers.Count > 0)
             {
-                int frames = _nds.Sound.ReadSamples(_samples);
+                int frames = nds.Sound.ReadSamples(_samples);
                 if (frames == 0)
                     break;
                 uint buffer = _freeBuffers.Dequeue();
                 fixed (short* data = _samples)
-                    _al.BufferData(buffer, BufferFormat.Stereo16, data, frames * 4, _nds.Sound.SampleRate);
+                    _al.BufferData(buffer, BufferFormat.Stereo16, data, frames * 4, nds.Sound.SampleRate);
                 _al.SourceQueueBuffers(_source, 1, &buffer);
             }
 
             // Keep latency bounded: if OpenAL is behind (all buffers queued), drop the excess.
-            while (_nds.Sound.BufferedFrames > MaxBacklogFrames)
-                _nds.Sound.ReadSamples(_samples);
+            while (nds.Sound.BufferedFrames > MaxBacklogFrames)
+                nds.Sound.ReadSamples(_samples);
 
             _al.GetSourceProperty(_source, GetSourceInteger.SourceState, out int state);
             if ((SourceState)state != SourceState.Playing)

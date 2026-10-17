@@ -42,7 +42,11 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
                 if (da >= 0)
                     output.Add(a);
                 if ((da >= 0) != (db >= 0))
-                    output.Add(Interpolate(a, b, da, da - db));
+                {
+                    // Always interpolate from the inside vertex, so a shared edge clipped by two
+                    // neighbouring polygons yields exactly the same new vertex for both.
+                    output.Add(da >= 0 ? Interpolate(a, b, da, da - db) : Interpolate(b, a, db, db - da));
+                }
             }
             return output;
         }

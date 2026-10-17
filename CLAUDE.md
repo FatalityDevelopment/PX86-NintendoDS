@@ -30,19 +30,24 @@ Px86.NintendoDS.sln
 │   ├── Cpu/Coprocessors/Cp15.cs     # ARM9 system control coprocessor (TCM, vectors, halt)
 │   ├── Disassembler/                # ARM and Thumb disassemblers
 │   └── Interfaces/                  # IArmMemoryBus, ICoprocessor
-├── Px86.NintendoDS.FileFormats/     # .nds header/NitroFS, CRC16, PNG writer
+├── Px86.NintendoDS.FileFormats/     # .nds header/NitroFS, CRC16, PNG + JPEG writers
 ├── Px86.NintendoDS.EmulatorCore/    # The console
 │   ├── NdsEmulator.cs               # Owns everything; RunFrame / slice loop
 │   ├── Scheduler.cs                 # Event scheduler (time in ARM9 cycles)
 │   ├── Arm9MemoryBus.cs / Arm7MemoryBus.cs   # Memory maps + I/O dispatch
 │   ├── DirectBoot.cs, GameSession.cs
+│   ├── Hosting/EmulatorHost.cs      # Runs the console on its own thread; thread-safe control (Invoke, pause, step…)
+│   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory access
+│   ├── Remote/                      # PINE socket (28013) + GS frame stream (28014), see docs/pine-protocol.md
 │   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, system control
 │   ├── Cartridge/                   # Slot protocol, KEY1, save memory (EEPROM/FLASH/FRAM)
 │   ├── Bios/                        # HLE BIOS (SWIs), BIOS stubs, sound tables
 │   ├── Video/                       # LCD timing, VRAM banks, 2D engines, Gpu3D/
 │   └── Audio/                       # SPU
 ├── Px86.NintendoDS.Emulator/        # Silk.NET frontend (SDL window, OpenGL, OpenAL, input, headless mode)
-├── Px86.NintendoDS.TestProject/     # MSTest suite: Cpu/, Emulator/, Video/, TestRoms/
+│   ├── Ui/                          # Dear ImGui menu bar, settings, file browser, notifications (ASCII text only)
+│   └── ScreenLayout.cs              # Screen placement + mouse→touch mapping (pure, unit-tested)
+├── Px86.NintendoDS.TestProject/     # MSTest suite: Cpu/, Emulator/, Video/, Remote/, Debugging/, Frontend/, TestRoms/
 ├── tools/testroms/                  # clang-based test ROM toolchain (C sources → TestRoms/*.nds)
 └── docs/                            # Architecture, hardware reference, learning resources, roadmap
 ```
@@ -54,6 +59,7 @@ dotnet build Px86.NintendoDS.sln -c Release
 dotnet test Px86.NintendoDS.TestProject
 dotnet run --project Px86.NintendoDS.Emulator -c Release -- game.nds
 dotnet run --project Px86.NintendoDS.Emulator -c Release -- game.nds --headless --frames 600 --screenshot out.png
+dotnet run --project Px86.NintendoDS.Emulator -c Release -- game.nds --headless   # PINE + GS server until Ctrl+C
 tools/testroms/build.sh               # rebuild test ROMs (needs clang, ld.lld, llvm-objcopy, python3)
 ```
 
@@ -100,6 +106,14 @@ or `xvfb-run` to run the real window, and read the PNG to check rendering.
 - IRQ handler pointers: ARM9 `[DTCM+0x3FFC]`, ARM7 `[0x0380FFFC]`. IntrWait check bits: `[DTCM+0x3FF8]` / `[0x0380FFF8]`.
 - IRQ bits: 0 VBlank, 1 HBlank, 2 VCount, 3–6 timers, 7 RTC, 8–11 DMA, 12 keypad, 16 IPC sync, 17 IPC send empty,
   18 IPC recv not empty, 19 cart done, 21 GXFIFO (ARM9), 22 hinge, 23 SPI, 24 Wifi (ARM7).
+
+### Remote control and threading
+
+- Anything that touches a running emulator from another thread goes through `EmulatorHost.Invoke`. The
+  host runs the console in `ChunkCycles` chunks under that lock.
+- PINE opcode numbers 0x00–0x42 must stay compatible with CodeDesigner's `PineClient`
+  (`CodeDesigner.Ps2.Bridge/PineClient.cs`). DS-only opcodes go at 0x60+.
+- Document every opcode in `docs/pine-protocol.md` and test it in `TestProject/Remote/`.
 
 ### Video
 

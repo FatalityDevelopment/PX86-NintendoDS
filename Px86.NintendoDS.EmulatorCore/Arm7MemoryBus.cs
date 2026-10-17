@@ -53,6 +53,25 @@ namespace Px86.NintendoDS.EmulatorCore
         // ── Shared WRAM view ──────────────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>Where code at <paramref name="address"/> lives, for the block cache (null = don't cache).</summary>
+        public byte[]? LocateCode(uint address, out int index)
+        {
+            switch (address >> 24)
+            {
+                case 0x00 when address < 0x4000:
+                    index = (int)address;
+                    return _nds.Bios7;
+                case 0x02:
+                    index = (int)(address & NdsEmulator.MainRamMask);
+                    return _nds.MainRam;
+                case 0x03:
+                    return WramFor(address, out index);
+                default:
+                    index = 0;
+                    return null;
+            }
+        }
+
         private byte[] WramFor(uint address, out int index)
         {
             if ((address & 0x00800000u) != 0)
@@ -156,11 +175,18 @@ namespace Px86.NintendoDS.EmulatorCore
             address &= ~3u;
             switch (address >> 24)
             {
-                case 0x02: MemoryAccess.Write32(_nds.MainRam, (int)(address & NdsEmulator.MainRamMask), value); break;
+                case 0x02:
+                {
+                    int i = (int)(address & NdsEmulator.MainRamMask);
+                    MemoryAccess.Write32(_nds.MainRam, i, value);
+                    if (_nds.Code.MainRamPageHasCode(i)) _nds.Code.OnWrite(_nds.MainRam, i);
+                    break;
+                }
                 case 0x03:
                 {
                     var memory = WramFor(address, out int i);
                     MemoryAccess.Write32(memory, i, value);
+                    _nds.Code.OnWrite(memory, i);
                     break;
                 }
                 case 0x04:
@@ -183,11 +209,18 @@ namespace Px86.NintendoDS.EmulatorCore
             address &= ~1u;
             switch (address >> 24)
             {
-                case 0x02: MemoryAccess.Write16(_nds.MainRam, (int)(address & NdsEmulator.MainRamMask), value); break;
+                case 0x02:
+                {
+                    int i = (int)(address & NdsEmulator.MainRamMask);
+                    MemoryAccess.Write16(_nds.MainRam, i, value);
+                    if (_nds.Code.MainRamPageHasCode(i)) _nds.Code.OnWrite(_nds.MainRam, i);
+                    break;
+                }
                 case 0x03:
                 {
                     var memory = WramFor(address, out int i);
                     MemoryAccess.Write16(memory, i, value);
+                    _nds.Code.OnWrite(memory, i);
                     break;
                 }
                 case 0x04:
@@ -204,11 +237,18 @@ namespace Px86.NintendoDS.EmulatorCore
         {
             switch (address >> 24)
             {
-                case 0x02: _nds.MainRam[address & NdsEmulator.MainRamMask] = value; break;
+                case 0x02:
+                {
+                    int i = (int)(address & NdsEmulator.MainRamMask);
+                    _nds.MainRam[i] = value;
+                    if (_nds.Code.MainRamPageHasCode(i)) _nds.Code.OnWrite(_nds.MainRam, i);
+                    break;
+                }
                 case 0x03:
                 {
                     var memory = WramFor(address, out int i);
                     memory[i] = value;
+                    _nds.Code.OnWrite(memory, i);
                     break;
                 }
                 case 0x04:

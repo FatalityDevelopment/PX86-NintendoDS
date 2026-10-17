@@ -199,10 +199,14 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
                         Consider(EdgeAt(b), ref left, ref right, ref found);
                         continue;
                     }
-                    double lo = Math.Min(y0, y1), hi = Math.Max(y0, y1);
-                    if (sampleY < lo || sampleY > hi) continue;
-                    double t = (sampleY - y0) / (y1 - y0);
-                    Consider(Lerp(EdgeAt(a), EdgeAt(b), t), ref left, ref right, ref found);
+                    // Walk every edge from its upper vertex, so two polygons sharing an
+                    // edge compute bit-identical X positions (no 1-pixel cracks between them).
+                    bool down = y0 < y1;
+                    ref var top = ref down ? ref a : ref b;
+                    ref var bottom = ref down ? ref b : ref a;
+                    if (sampleY < top.ScreenY || sampleY > bottom.ScreenY) continue;
+                    double t = (sampleY - top.ScreenY) / (bottom.ScreenY - top.ScreenY);
+                    Consider(Lerp(EdgeAt(top), EdgeAt(bottom), t), ref left, ref right, ref found);
                 }
                 if (!found)
                     continue;
