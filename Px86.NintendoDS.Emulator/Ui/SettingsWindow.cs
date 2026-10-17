@@ -71,6 +71,7 @@ namespace Px86.NintendoDS.Emulator.Ui
                     Tab("Input", InputTab);
                     Tab("Firmware user", FirmwareTab);
                     Tab("Emulation", EmulationTab);
+                    Tab("Network", NetworkTab);
                     Tab("Remote", RemoteTab);
                     ImGui.EndTabBar();
                 }
@@ -274,6 +275,57 @@ namespace Px86.NintendoDS.Emulator.Ui
         }
 
         private static readonly string[] CpuModes = { "Interpreter", "Cached", "JIT" };
+
+        private static readonly string[] WirelessModes = { "Off", "Local wireless", "Local wireless + online" };
+
+        private void NetworkTab()
+        {
+            var s = _ui.Settings;
+            var wireless = _ui.Remote.Wireless;
+            ImGui.TextWrapped("Local wireless links emulator windows for trades, battles and DS Download Play: start the " +
+                              "game in two windows (on this PC, or on the LAN with the option below) with the same port.");
+            ImGui.TextWrapped("Online adds a built-in access point, \"" + EmulatorCore.Network.SoftAccessPoint.Ssid + "\". Nintendo's own " +
+                              "WFC servers are closed: set the DNS server of a replacement service. With your own firmware, " +
+                              "pick the access point once in the game's Nintendo WFC Settings (Search for an Access Point).");
+            ImGui.Spacing();
+
+            int mode = (int)s.WirelessMode;
+            ImGui.Combo("Mode", ref mode, WirelessModes, WirelessModes.Length);
+            s.WirelessMode = (WirelessMode)mode;
+            int port = s.WirelessPort;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.InputInt("UDP port", ref port))
+                s.WirelessPort = Math.Clamp(port, 1024, 65535);
+            bool lan = s.WirelessLan;
+            if (ImGui.Checkbox("Also reach emulators on other PCs in the local network", ref lan))
+                s.WirelessLan = lan;
+            string dns = s.OnlineDns ?? "";
+            ImGui.SetNextItemWidth(200);
+            if (ImGui.InputText("DNS server (online)", ref dns, 64))
+                s.OnlineDns = string.IsNullOrWhiteSpace(dns) ? null : dns.Trim();
+            ImGui.TextDisabled("Empty = this PC's DNS. Example format: 1.2.3.4");
+
+            if (ImGui.Button("Apply"))
+            {
+                if (s.WirelessMode == WirelessMode.Online && s.OnlineDns != null && EmulatorCore.Network.OnlineWifiMedium.ParseDns(s.OnlineDns) == null)
+                    _ui.Notifications.Add("The DNS server must be an IP address like 1.2.3.4.");
+                else
+                {
+                    wireless.Apply(s.WirelessMode, s.WirelessPort, s.WirelessLan, s.OnlineDns);
+                    _ui.Launcher.TrySaveSettings();
+                }
+            }
+
+            ImGui.Separator();
+            ImGui.TextUnformatted($"Now: {WirelessModes[(int)wireless.Mode]}. This is emulator window {WirelessServices.InstanceNumber + 1}" +
+                                  (WirelessServices.InstanceNumber > 0 ? " (it uses its own MAC address)." : "."));
+            if (wireless.Mode != WirelessMode.Off)
+                ImGui.TextDisabled($"Other consoles heard recently: {wireless.PeerCount()}.");
+            if (wireless.Online is { } online)
+                ImGui.TextDisabled($"Access point: {online.AccessPoint.AssociatedStations} console(s) connected, {online.Router.OpenConnections} open connection(s).");
+            if (_ui.Host.Emulator is { } nds)
+                ImGui.TextDisabled($"Wifi frames sent {nds.Wifi.FramesSent}, received {nds.Wifi.FramesReceived}.");
+        }
 
         private void RemoteTab()
         {

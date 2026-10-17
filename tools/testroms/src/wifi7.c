@@ -258,7 +258,8 @@ static void single_console(void)
 static void master(void)
 {
     wait_us(20000); /* let the slave get ready */
-    for (int attempt = 0; attempt < 20 && RESULT7(15) == 0; attempt++) {
+    /* Replies wait in real time for the other console's thread: retry until one round is fully answered. */
+    for (int attempt = 0; attempt < 40 && !(RESULT7(15) != 0 && RESULT7(14) == 0); attempt++) {
         int body = put_frame(0x0400, 0x0228, mp_cmd, 8);
         WRAM16(body + 0) = 0x0106;
         WRAM16(body + 2) = 0x0002;          /* slave 1 */
@@ -280,22 +281,31 @@ static void master(void)
     }
 }
 
+/* A slave's driver re-arms REPLY1 after every CMD (the hardware moved it to REPLY2). */
+static void rearm_reply(void)
+{
+    if (!(W(W_TXBUF_REPLY1) & 0x8000))
+        W(W_TXBUF_REPLY1) = 0x8000 | (0x0600 / 2);
+}
+
 static void slave(void)
 {
-    W(W_AID_LOW) = 1;
-    int body = put_frame(0x0600, 0x0118, mp_reply, 4);
+    /* REPLY is ToDS: address 1 = BSSID (the master), 2 = us, 3 = 03:09:BF:00:00:10. */
+    static const u8 master_mac[6] = { 0x00, 0x09, 0xBF, 0x00, 0x00, 0x02 };
+    int body = put_frame(0x0600, 0x0118, master_mac, 4);
+    ram_put(0x0600 + 12 + 16, mp_reply, 6);
     ram_put(body, (const u8 *)"RPLY", 4);
-    W(W_TXBUF_REPLY1) = 0x8000 | (0x0600 / 2);
+    rearm_reply();
+    W(W_AID_LOW) = 1;
     for (int ms = 0; ms < 3000 && RESULT7(15) == 0; ms++) {
         int at, length, flags;
         while ((flags = rx_poll(&at, &length)) >= 0) {
-            if ((flags & 0xF) == 0xC) {
+            if ((flags & 0xF) == 0xC)
                 RESULT7(14) = ring32(at + 4); /* after REPLYTIME and the slave mask: "CMD!" */
-                W(W_TXBUF_REPLY1) = 0x8000 | (0x0600 / 2);
-            }
             if ((flags & 0xF) == 0xD)
                 RESULT7(15)++;
         }
+        rearm_reply();
         wait_us(1000);
     }
 }
@@ -319,5 +329,7 @@ int main(void)
     for (;;) {
         int at, length;
         rx_poll(&at, &length);
+        if (role == 2)
+            rearm_reply();
     }
 }

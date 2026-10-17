@@ -56,26 +56,26 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
     public sealed class WifiController
     {
         // ── Register offsets (from 04808000h) ─────────────────────────────────
-        public const int W_ID = 0x000, W_MODE_RST = 0x004, W_MODE_WEP = 0x006, W_TXSTATCNT = 0x008;
-        public const int W_IF = 0x010, W_IE = 0x012, W_MACADDR = 0x018, W_BSSID = 0x020, W_AID_LOW = 0x028, W_AID_FULL = 0x02A;
-        public const int W_RXCNT = 0x030, W_POWER_US = 0x036, W_POWER_TX = 0x038, W_POWERSTATE = 0x03C, W_POWERFORCE = 0x040;
-        public const int W_RANDOM = 0x044;
-        public const int W_RXBUF_BEGIN = 0x050, W_RXBUF_END = 0x052, W_RXBUF_WRCSR = 0x054, W_RXBUF_WR_ADDR = 0x056;
-        public const int W_RXBUF_RD_ADDR = 0x058, W_RXBUF_READCSR = 0x05A, W_RXBUF_COUNT = 0x05C, W_RXBUF_RD_DATA = 0x060;
-        public const int W_RXBUF_GAP = 0x062, W_RXBUF_GAPDISP = 0x064;
-        public const int W_TXBUF_WR_ADDR = 0x068, W_TXBUF_COUNT = 0x06C, W_TXBUF_WR_DATA = 0x070, W_TXBUF_GAP = 0x074, W_TXBUF_GAPDISP = 0x076;
-        public const int W_TXBUF_BEACON = 0x080, W_LISTENCOUNT = 0x088, W_BEACONINT = 0x08C, W_LISTENINT = 0x08E;
-        public const int W_TXBUF_CMD = 0x090, W_TXBUF_REPLY1 = 0x094, W_TXBUF_REPLY2 = 0x098;
-        public const int W_TXBUF_LOC1 = 0x0A0, W_TXBUF_LOC2 = 0x0A4, W_TXBUF_LOC3 = 0x0A8;
-        public const int W_TXREQ_RESET = 0x0AC, W_TXREQ_SET = 0x0AE, W_TXREQ_READ = 0x0B0, W_TXBUF_RESET = 0x0B4;
-        public const int W_TXBUSY = 0x0B6, W_TXSTAT = 0x0B8, W_PREAMBLE = 0x0BC, W_RXFILTER = 0x0D0;
-        public const int W_US_COUNTCNT = 0x0E8, W_US_COMPARECNT = 0x0EA, W_US_COMPARE0 = 0x0F0, W_US_COUNT0 = 0x0F8;
-        public const int W_CONTENTFREE = 0x10C, W_PRE_BEACON = 0x110, W_CMD_COUNT = 0x118, W_BEACON_COUNT = 0x11C, W_POST_BEACON = 0x134;
-        public const int W_BB_CNT = 0x158, W_BB_WRITE = 0x15A, W_BB_READ = 0x15C, W_BB_BUSY = 0x15E, W_BB_MODE = 0x160, W_BB_POWER = 0x168;
-        public const int W_RF_DATA2 = 0x17C, W_RF_DATA1 = 0x17E, W_RF_BUSY = 0x180, W_RF_CNT = 0x184;
-        public const int W_TX_HDR_CNT = 0x194, W_RF_PINS = 0x19C;
-        public const int W_RXSTAT_INC_IF = 0x1A8, W_RXSTAT_OVF_IF = 0x1AC, W_RXSTAT = 0x1B0, W_TX_ERR_COUNT = 0x1C0, W_RX_COUNT = 0x1C4;
-        public const int W_CMD_STAT = 0x1D0, W_TX_SEQNO = 0x210, W_RF_STATUS = 0x214, W_IF_SET = 0x21C, W_RXTX_ADDR = 0x268;
+        public const uint W_ID = 0x000, W_MODE_RST = 0x004, W_MODE_WEP = 0x006, W_TXSTATCNT = 0x008;
+        public const uint W_IF = 0x010, W_IE = 0x012, W_MACADDR = 0x018, W_BSSID = 0x020, W_AID_LOW = 0x028, W_AID_FULL = 0x02A;
+        public const uint W_RXCNT = 0x030, W_POWER_US = 0x036, W_POWER_TX = 0x038, W_POWERSTATE = 0x03C, W_POWERFORCE = 0x040;
+        public const uint W_RANDOM = 0x044;
+        public const uint W_RXBUF_BEGIN = 0x050, W_RXBUF_END = 0x052, W_RXBUF_WRCSR = 0x054, W_RXBUF_WR_ADDR = 0x056;
+        public const uint W_RXBUF_RD_ADDR = 0x058, W_RXBUF_READCSR = 0x05A, W_RXBUF_COUNT = 0x05C, W_RXBUF_RD_DATA = 0x060;
+        public const uint W_RXBUF_GAP = 0x062, W_RXBUF_GAPDISP = 0x064;
+        public const uint W_TXBUF_WR_ADDR = 0x068, W_TXBUF_COUNT = 0x06C, W_TXBUF_WR_DATA = 0x070, W_TXBUF_GAP = 0x074, W_TXBUF_GAPDISP = 0x076;
+        public const uint W_TXBUF_BEACON = 0x080, W_LISTENCOUNT = 0x088, W_BEACONINT = 0x08C, W_LISTENINT = 0x08E;
+        public const uint W_TXBUF_CMD = 0x090, W_TXBUF_REPLY1 = 0x094, W_TXBUF_REPLY2 = 0x098;
+        public const uint W_TXBUF_LOC1 = 0x0A0, W_TXBUF_LOC2 = 0x0A4, W_TXBUF_LOC3 = 0x0A8;
+        public const uint W_TXREQ_RESET = 0x0AC, W_TXREQ_SET = 0x0AE, W_TXREQ_READ = 0x0B0, W_TXBUF_RESET = 0x0B4;
+        public const uint W_TXBUSY = 0x0B6, W_TXSTAT = 0x0B8, W_PREAMBLE = 0x0BC, W_RXFILTER = 0x0D0;
+        public const uint W_US_COUNTCNT = 0x0E8, W_US_COMPARECNT = 0x0EA, W_US_COMPARE0 = 0x0F0, W_US_COUNT0 = 0x0F8;
+        public const uint W_CONTENTFREE = 0x10C, W_PRE_BEACON = 0x110, W_CMD_COUNT = 0x118, W_BEACON_COUNT = 0x11C, W_POST_BEACON = 0x134;
+        public const uint W_BB_CNT = 0x158, W_BB_WRITE = 0x15A, W_BB_READ = 0x15C, W_BB_BUSY = 0x15E, W_BB_MODE = 0x160, W_BB_POWER = 0x168;
+        public const uint W_RF_DATA2 = 0x17C, W_RF_DATA1 = 0x17E, W_RF_BUSY = 0x180, W_RF_CNT = 0x184;
+        public const uint W_TX_HDR_CNT = 0x194, W_RF_PINS = 0x19C;
+        public const uint W_RXSTAT_INC_IF = 0x1A8, W_RXSTAT_OVF_IF = 0x1AC, W_RXSTAT = 0x1B0, W_TX_ERR_COUNT = 0x1C0, W_RX_COUNT = 0x1C4;
+        public const uint W_CMD_STAT = 0x1D0, W_TX_SEQNO = 0x210, W_RF_STATUS = 0x214, W_IF_SET = 0x21C, W_RXTX_ADDR = 0x268;
 
         // ── IRQ bits ──────────────────────────────────────────────────────────
         public const int IRQ_RX_DONE = 0, IRQ_TX_DONE = 1, IRQ_RX_START = 6, IRQ_TX_START = 7, IRQ_TXBUF_COUNT = 8;
@@ -98,6 +98,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
         private ushort _random = 1;
         private long _randomTime;
         private bool _preBeaconFired;
+        private ushort _rxDataLatch;
 
         // Transmit in progress (one at a time); -1 = idle.
         private int _txSlot = -1;
@@ -134,6 +135,10 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
         /// <summary>Frames sent and received, for the UI and tests.</summary>
         public long FramesSent { get; private set; }
         public long FramesReceived { get; private set; }
+
+        /// <summary>Frames that arrived but were not stored: receiver off, filtered out, or no room in the RX ring.</summary>
+        public long FramesIgnored { get; private set; }
+        public long FramesDropped { get; private set; }
 
         /// <summary>A frame left this console (after the hardware's header fix-ups).</summary>
         public event Action<WifiPacket>? Transmitted;
@@ -187,9 +192,9 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             _scheduler.Cancel(SchedulerEvent.WifiTx);
         }
 
-        private const int W_TX_RETRYLIMIT = 0x02C;
+        private const uint W_TX_RETRYLIMIT = 0x02C;
 
-        private ref ushort R(int offset) => ref _reg[(offset & 0xFFF) >> 1];
+        private ref ushort R(uint offset) => ref _reg[(offset & 0xFFF) >> 1];
 
         private long Now => _scheduler.CurrentTime;
 
@@ -202,8 +207,13 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             if (offset >= 0x4000 && offset < 0x6000)
                 return BinaryPrimitives.ReadUInt16LittleEndian(Ram.AsSpan((int)(offset - 0x4000)));
             if (offset >= 0x1000)
-                return offset is >= 0x6000 and < 0x7000 ? _reg[(offset & 0xFFF) >> 1] : (ushort)0; // passive mirrors
-            return ReadRegister((int)offset);
+            {
+                // 1000h, 6000h and 7000h are passive mirrors: no side effects, RD_DATA returns its latch.
+                if (offset is (>= 0x1000 and < 0x2000) or >= 0x6000)
+                    return (offset & 0xFFF) == W_RXBUF_RD_DATA ? _rxDataLatch : _reg[(offset & 0xFFF) >> 1];
+                return 0;
+            }
+            return ReadRegister(offset);
         }
 
         /// <summary>16-bit write; 8-bit writes to the Wifi window are ignored by the hardware.</summary>
@@ -216,10 +226,10 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                 return;
             }
             if (offset < 0x1000)
-                WriteRegister((int)offset, value);
+                WriteRegister(offset, value);
         }
 
-        private ushort ReadRegister(int offset)
+        private ushort ReadRegister(uint offset)
         {
             switch (offset)
             {
@@ -228,9 +238,17 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                 case W_RXBUF_RD_DATA:
                     return ReadRxData();
                 case W_US_COUNT0: case W_US_COUNT0 + 2: case W_US_COUNT0 + 4: case W_US_COUNT0 + 6:
-                    return (ushort)(UsCount() >> ((offset - W_US_COUNT0) * 8));
+                    return (ushort)(UsCount() >> (int)((offset - W_US_COUNT0) * 8));
                 case W_CMD_COUNT:
                     return CurrentCmdCount();
+                case W_TXBUSY:
+                {
+                    int busy = R(W_TXBUSY) & 0x0010;
+                    for (int slot = 0; slot < 4; slot++)
+                        if ((R(W_TXREQ_READ) & (1 << slot)) != 0 && (R(SlotRegister(slot)) & 0x8000) != 0)
+                            busy |= 1 << slot;
+                    return (ushort)busy;
+                }
                 case 0x078: return R(W_TXBUF_WR_ADDR);
                 case 0x178: return R(W_RF_DATA2);
                 case W_BB_BUSY: case W_RF_BUSY: return 0;
@@ -255,7 +273,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             }
         }
 
-        private void WriteRegister(int offset, ushort value)
+        private void WriteRegister(uint offset, ushort value)
         {
             switch (offset)
             {
@@ -332,9 +350,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                     if ((value & 0x0002) != 0 && (R(W_POWERSTATE) & 0x0200) != 0)
                     {
                         // Queued power-up completes: the RF side wakes and says so with IRQ11.
-                        R(W_POWERSTATE) &= unchecked((ushort)~0x0202);
-                        R(W_RF_STATUS) = 0x0001;
-                        R(W_RF_PINS) = 0x0084;
+                        WakeUp();
                         RaiseIrq(IRQ_RF_WAKEUP);
                     }
                     return;
@@ -343,7 +359,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                     if ((value & 0x8000) != 0)
                     {
                         if ((value & 1) != 0) PowerDown();
-                        else R(W_POWERSTATE) &= unchecked((ushort)~0x0200);
+                        else WakeUp();
                     }
                     return;
 
@@ -396,7 +412,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                     return;
                 case W_US_COUNT0: case W_US_COUNT0 + 2: case W_US_COUNT0 + 4: case W_US_COUNT0 + 6:
                 {
-                    int shift = (offset - W_US_COUNT0) * 8;
+                    int shift = (int)(offset - W_US_COUNT0) * 8;
                     ulong count = UsCount();
                     count = (count & ~(0xFFFFUL << shift)) | ((ulong)value << shift);
                     _usBase = count;
@@ -405,7 +421,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                     return;
                 }
                 case W_US_COMPARE0:
-                    R(offset) = (ushort)(value & 0xFC00);
+                    R(offset) = (ushort)(value & 0xFC01);
                     return;
                 case W_CMD_COUNT:
                     R(W_CMD_COUNT) = value;
@@ -435,7 +451,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
 
         private void ResetPortGroup14()
         {
-            foreach (int r in new[] { W_MODE_WEP, W_TXSTATCNT, 0x00A, W_MACADDR, W_MACADDR + 2, W_MACADDR + 4,
+            foreach (uint r in new uint[] { W_MODE_WEP, W_TXSTATCNT, 0x00A, W_MACADDR, W_MACADDR + 2, W_MACADDR + 4,
                                       W_BSSID, W_BSSID + 2, W_BSSID + 4, W_AID_LOW, W_AID_FULL, 0x02E, 0x084, 0x194, 0x198 })
                 R(r) = 0;
             R(W_TX_RETRYLIMIT) = 0x0707;
@@ -449,6 +465,23 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             R(0x1A2) = 0x0001;
             R(0x224) = 0x0003;
             R(0x230) = 0x0047;
+        }
+
+        /// <summary>Auto-sleep after the post-beacon slot (IRQ13): like a forced power-down, but TX requests stay.</summary>
+        private void Sleep()
+        {
+            R(0x034) = 0x0002;
+            R(W_POWERSTATE) |= 0x0200;
+            R(W_RF_PINS) = 0x0046;
+            R(W_RF_STATUS) = 0x0009;
+        }
+
+        private void WakeUp()
+        {
+            R(W_POWERSTATE) &= unchecked((ushort)~0x0202);
+            R(W_RF_STATUS) = 0x0001;
+            R(W_RF_PINS) = 0x0084;
+            StartNextTransmit();
         }
 
         private void PowerDown()
@@ -563,7 +596,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             {
                 RaiseIrq(IRQ_POST_BEACON);
                 if ((R(W_POWER_TX) & 2) == 0)
-                    PowerDown();
+                    Sleep();
             }
 
             // W_BEACON_COUNT: IRQ15 W_PRE_BEACON µs early, IRQ14 at zero, reloaded at once.
@@ -573,20 +606,33 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                 if (count != 0)
                     count--;
                 R(W_BEACON_COUNT) = count;
-                if (!_preBeaconFired && count * UsPerTick <= R(W_PRE_BEACON) && compare)
+                if (!_preBeaconFired && count * UsPerTick <= R(W_PRE_BEACON))
                 {
                     _preBeaconFired = true;
-                    RaiseIrq(IRQ_PRE_BEACON);
+                    if (compare)
+                        RaiseIrq(IRQ_PRE_BEACON);
+                    if ((R(W_POWER_TX) & 1) != 0)
+                        WakeUp(); // auto-wakeup for the coming beacon
                 }
                 if (count == 0)
-                    BeaconInterrupt(forced: false);
+                {
+                    if ((R(W_US_COMPARE0) & 1) == 0)
+                        BeaconInterrupt(forced: false);
+                    else
+                        R(W_BEACON_COUNT) = R(W_BEACONINT); // blocked until W_US_COUNT = W_US_COMPARE
+                }
             }
 
             // W_US_COMPARE (millisecond resolution).
             ulong compareValue = (ulong)R(W_US_COMPARE0) | (ulong)R(W_US_COMPARE0 + 2) << 16
                                  | (ulong)R(W_US_COMPARE0 + 4) << 32 | (ulong)R(W_US_COMPARE0 + 6) << 48;
             if (compare && ((_usBase ^ compareValue) & ~0x3FFUL) == 0)
+            {
+                R(W_US_COMPARE0) &= 0xFFFE;
                 BeaconInterrupt(forced: false);
+            }
+
+            CheckCommandExpired();
         }
 
         private void BeaconInterrupt(bool forced)
@@ -596,7 +642,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                 R(W_BEACON_COUNT) = R(W_BEACONINT);
                 _preBeaconFired = false;
             }
-            if ((R(W_US_COMPARECNT) & 1) == 0 && !forced)
+            if ((R(W_US_COMPARECNT) & 1) == 0)
                 return;
             RaiseIrq(IRQ_BEACON);
             R(W_POST_BEACON) = 0xFFFF;
@@ -611,25 +657,31 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
 
         // ── RX ring ───────────────────────────────────────────────────────────
 
+        /// <summary>BEGIN/END are addresses in the Wifi window (4000h–6000h); END = 6000h means the end of RAM.</summary>
+        private static int RingAddress(ushort value) => value >= 0x4000 ? Math.Min(value - 0x4000, 0x2000) & ~1 : value & 0x1FFE;
+        private int RxBegin => RingAddress(R(W_RXBUF_BEGIN));
+        private int RxEnd => RingAddress(R(W_RXBUF_END));
+
         /// <summary>Byte offset in Wifi RAM after advancing <paramref name="byteAddress"/> by 2 with BEGIN/END wrapping.</summary>
         private int RxAdvance(int byteAddress)
         {
-            byteAddress = (byteAddress + 2) & 0x1FFE;
-            if (byteAddress == (R(W_RXBUF_END) & 0x1FFE))
-                byteAddress = R(W_RXBUF_BEGIN) & 0x1FFE;
-            return byteAddress;
+            byteAddress += 2;
+            if (byteAddress == RxEnd)
+                byteAddress = RxBegin;
+            return byteAddress & 0x1FFE;
         }
 
         private ushort ReadRxData()
         {
             int address = R(W_RXBUF_RD_ADDR) & 0x1FFE;
             ushort value = BinaryPrimitives.ReadUInt16LittleEndian(Ram.AsSpan(address));
+            _rxDataLatch = value;
             address = RxAdvance(address);
             int gap = R(W_RXBUF_GAP) & 0x1FFE;
             if (gap != 0 && address == gap)
             {
                 address += R(W_RXBUF_GAPDISP) * 2;
-                int end = R(W_RXBUF_END) & 0x1FFE, begin = R(W_RXBUF_BEGIN) & 0x1FFE;
+                int end = RxEnd, begin = RxBegin;
                 if (address >= end && end > begin)
                     address = address + begin - end;
                 address &= 0x1FFE;
@@ -657,7 +709,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             CountDown(W_TXBUF_COUNT, IRQ_TXBUF_COUNT);
         }
 
-        private void CountDown(int register, int irq)
+        private void CountDown(uint register, int irq)
         {
             if (R(register) == 0)
                 return;
@@ -665,21 +717,30 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
                 RaiseIrq(irq);
         }
 
+        // W_RXSTAT counter n lives at an irregular byte port (1B1h, 1B9h and 1BBh don't exist).
+        private static readonly uint[] StatPort = { 0x1B0, 0x1B2, 0x1B3, 0x1B4, 0x1B5, 0x1B6, 0x1B7, 0x1B8, 0x1BA, 0x1BC, 0x1BD, 0x1BE, 0x1BF };
+        public const int STAT_RXBUF_FULL = 3, STAT_RX_OK = 6;
+
+        /// <summary>Count an RX event: INC_IF bit, IRQ02 if enabled, IRQ04 when the counter reaches its half-overflow bit 7.</summary>
         private void IncrementStat(int index)
         {
-            int offset = W_RXSTAT + index;
-            ref ushort word = ref R(offset & ~1);
-            int shift = (offset & 1) * 8;
+            uint port = StatPort[index];
+            ref ushort word = ref R(port & ~1u);
+            int shift = (int)(port & 1) * 8;
             int counter = (word >> shift) & 0xFF;
             if (counter < 0xFF)
                 word = (ushort)((word & ~(0xFF << shift)) | ((counter + 1) << shift));
             R(W_RXSTAT_INC_IF) |= (ushort)(1 << index);
+            if ((R(0x1AA) & (1 << index)) != 0)
+                RaiseIrq(2);
+            if (counter == 0x7F && (R(0x1AE) & (1 << index)) != 0)
+                RaiseIrq(4);
         }
 
         private int RxStat(int index)
         {
-            int offset = W_RXSTAT + index;
-            return (R(offset & ~1) >> ((offset & 1) * 8)) & 0xFF;
+            uint port = StatPort[index];
+            return (R(port & ~1u) >> (int)((port & 1) * 8)) & 0xFF;
         }
 
         private void PollMedium()
@@ -694,7 +755,10 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
         {
             var frame = packet.Frame;
             if (!Powered || (R(W_RXCNT) & 0x8000) == 0 || frame.Length < 10)
+            {
+                FramesIgnored++;
                 return;
+            }
 
             ushort fc = packet.FrameControl;
             int type = (fc >> 2) & 3, subtype = (fc >> 4) & 0xF;
@@ -704,7 +768,10 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             bool ourBssid = !bssid.IsEmpty && bssid.SequenceEqual(RegisterBytes(W_BSSID));
             bool toUs = destination.SequenceEqual(RegisterBytes(W_MACADDR));
             if (!toUs && !(group && (ourBssid || (R(W_RXFILTER) & 1) != 0)))
+            {
+                FramesIgnored++;
                 return;
+            }
 
             int flags = type switch
             {
@@ -744,18 +811,18 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             };
         }
 
-        private byte[] RegisterBytes(int offset)
+        private byte[] RegisterBytes(uint offset)
         {
             var bytes = new byte[6];
             for (int i = 0; i < 3; i++)
-                BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(i * 2), R(offset + i * 2));
+                BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(i * 2), R(offset + (uint)i * 2));
             return bytes;
         }
 
         /// <summary>Write RX header + frame at WRCSR. False (and a "buffer full" count) when it doesn't fit before READCSR.</summary>
         private bool StoreReceived(ReadOnlySpan<byte> frame, int rate, ushort flags)
         {
-            int begin = R(W_RXBUF_BEGIN) & 0x1FFE, end = R(W_RXBUF_END) & 0x1FFE;
+            int begin = RxBegin, end = RxEnd;
             if (end <= begin)
                 return false;
             int start = (R(W_RXBUF_WRCSR) & 0xFFF) * 2;
@@ -764,7 +831,8 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             int free = read > start ? read - start : end - begin - (start - read);
             if (start < begin || start >= end || total >= free)
             {
-                IncrementStat(3);
+                IncrementStat(STAT_RXBUF_FULL);
+                FramesDropped++;
                 return false;
             }
 
@@ -795,7 +863,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
 
             R(W_RXBUF_WRCSR) = (ushort)(address / 2);
             BinaryPrimitives.WriteUInt16LittleEndian(Ram.AsSpan(0x1F6E), 0x0F01);
-            IncrementStat(6);
+            IncrementStat(STAT_RX_OK);
             R(W_RX_COUNT) = (ushort)Math.Min(0xFF, (R(W_RX_COUNT) & 0xFF) + 1);
             RaiseIrq(IRQ_RX_DONE);
             return true;
@@ -805,7 +873,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
 
         // Transmit slots: index = W_TXREQ bit; LOC3 goes first, LOC1 last.
         private static readonly int[] SlotOrder = { 3, 2, 1, 0 };
-        private static int SlotRegister(int slot) => slot switch { 0 => W_TXBUF_LOC1, 1 => W_TXBUF_CMD, 2 => W_TXBUF_LOC2, _ => W_TXBUF_LOC3 };
+        private static uint SlotRegister(int slot) => slot switch { 0 => W_TXBUF_LOC1, 1 => W_TXBUF_CMD, 2 => W_TXBUF_LOC2, _ => W_TXBUF_LOC3 };
 
         private void StartNextTransmit()
         {
@@ -875,7 +943,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             _txSlot = -1;
             if (slot < 0)
                 return;
-            int register = SlotRegister(slot);
+            uint register = SlotRegister(slot);
             int header = (R(register) & 0xFFF) * 2;
             Send(FrameAt(header));
 
@@ -950,9 +1018,9 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             for (int i = 1; i < 16; i++)
             {
                 if ((missing & (1 << i)) == 0) continue;
-                int offset = W_CMD_STAT + i;
-                ref ushort word = ref R(offset & ~1);
-                int shift = (offset & 1) * 8;
+                uint offset = W_CMD_STAT + (uint)i;
+                ref ushort word = ref R(offset & ~1u);
+                int shift = (int)(offset & 1) * 8;
                 int counter = Math.Min(0xFF, ((word >> shift) & 0xFF) + 1);
                 word = (ushort)((word & ~(0xFF << shift)) | (counter << shift));
             }
@@ -960,6 +1028,24 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             R(W_TXBUSY) &= unchecked((ushort)~0x0002);
             R(W_RF_STATUS) = 0x0001;
             R(W_RF_PINS) = 0x0084;
+            RaiseIrq(IRQ_CMD_DONE);
+        }
+
+        /// <summary>
+        /// W_CMD_COUNT ran out before a pending CMD could go out: the CMD fails
+        /// (TXHDR[0] = 0005h, every slave missing) and IRQ12 still fires, so the
+        /// master's driver isn't left waiting.
+        /// </summary>
+        private void CheckCommandExpired()
+        {
+            if ((R(W_TXBUF_CMD) & 0x8000) == 0 || (R(W_TXREQ_READ) & 0x0002) == 0 || _txSlot == 1 || CurrentCmdCount() != 0)
+                return;
+            int header = (R(W_TXBUF_CMD) & 0xFFF) * 2;
+            ushort wanted = (ushort)(BinaryPrimitives.ReadUInt16LittleEndian(Ram.AsSpan((header + 12 + 24 + 2) & 0x1FFE)) & 0xFFFE);
+            BinaryPrimitives.WriteUInt16LittleEndian(Ram.AsSpan(header), 0x0005);
+            BinaryPrimitives.WriteUInt16LittleEndian(Ram.AsSpan((header + 2) & 0x1FFE), wanted);
+            R(W_TXBUF_CMD) &= 0x7FFF;
+            R(W_TX_SEQNO) = (ushort)((R(W_TX_SEQNO) + 1) & 0x0FFF);
             RaiseIrq(IRQ_CMD_DONE);
         }
 
@@ -998,9 +1084,9 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             {
                 var empty = new byte[24];
                 BinaryPrimitives.WriteUInt16LittleEndian(empty, 0x0158);
-                ReplyAddress.CopyTo(empty, 4);
+                RegisterBytes(W_BSSID).CopyTo(empty, 4);   // ToDS: address 1 = BSSID
                 RegisterBytes(W_MACADDR).CopyTo(empty, 10);
-                RegisterBytes(W_BSSID).CopyTo(empty, 16);
+                ReplyAddress.CopyTo(empty, 16);            // address 3 = DA
                 BinaryPrimitives.WriteUInt16LittleEndian(empty.AsSpan(22), (ushort)(R(W_TX_SEQNO) << 4));
                 R(W_TX_SEQNO) = (ushort)((R(W_TX_SEQNO) + 1) & 0x0FFF);
                 packet = new WifiPacket { Frame = empty, Rate = 0x14, Sender = Id, ReplyAid = aid };
@@ -1040,6 +1126,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Wifi
             s.Sync(ref _random);
             s.Sync(ref _randomTime);
             s.Sync(ref _preBeaconFired);
+            s.Sync(ref _rxDataLatch);
             s.Sync(ref _txSlot);
             s.Sync(ref _cmdCountTime);
             Baseband.Serialize(s);

@@ -49,6 +49,10 @@ namespace Px86.NintendoDS.Emulator
             if (cl.FirmwarePath != null) settings.FirmwarePath = cl.FirmwarePath;
             if (cl.RealBios) settings.UseRealBios = true;
             if (cl.CpuMode is { } cpuMode) settings.CpuMode = cpuMode;
+            if (cl.Wireless is { } wireless) settings.WirelessMode = wireless;
+            if (cl.WirelessPort is { } wifiPort) settings.WirelessPort = wifiPort;
+            if (cl.WirelessLan) settings.WirelessLan = true;
+            if (cl.Dns != null) settings.OnlineDns = cl.Dns;
             if (cl.Scale is int scale) settings.Scale = Math.Clamp(scale, 1, 8);
             if (cl.SaveSettings) settings.Save();
 
@@ -67,6 +71,13 @@ namespace Px86.NintendoDS.Emulator
 
             if (cl.Headless && !cl.ServerMode)
             {
+                using var batchWireless = new WirelessServices(host);
+                batchWireless.Log += Console.WriteLine;
+                if (settings.WirelessMode != WirelessMode.Off)
+                {
+                    batchWireless.Apply(settings.WirelessMode, settings.WirelessPort, settings.WirelessLan, settings.OnlineDns);
+                    session!.Emulator.Wifi.Medium = batchWireless.Medium;
+                }
                 using (session)
                     return RunHeadless(session!, cl);
             }
@@ -83,6 +94,11 @@ namespace Px86.NintendoDS.Emulator
             remote.ShutdownRequested += shutdown.Set;
             if (cl.ServerMode)
                 remote.Log += Console.WriteLine;
+
+            if (!cl.ServerMode)
+                remote.Wireless.Log += Console.WriteLine; // the server prints everything already
+            if (settings.WirelessMode != WirelessMode.Off)
+                remote.Wireless.Apply(settings.WirelessMode, settings.WirelessPort, settings.WirelessLan, settings.OnlineDns);
 
             bool gsOn = cl.Gs ?? (cl.ServerMode || settings.GsEnabled);
             bool pineOn = cl.Pine ?? (cl.ServerMode || settings.PineEnabled);

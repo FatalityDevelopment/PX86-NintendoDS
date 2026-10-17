@@ -20,6 +20,20 @@ namespace Px86.NintendoDS.EmulatorCore
 
         /// <summary>How the CPUs run code (the debugger always interprets).</summary>
         public CpuMode CpuMode { get; init; } = CpuMode.Interpreter;
+
+        /// <summary>
+        /// Where firmware changes made by games (Wifi connection settings, the
+        /// Nintendo WFC login) are kept between runs. Loaded instead of the
+        /// dump/generated firmware when it exists. Null = changes are lost.
+        /// </summary>
+        public string? FirmwareWritesPath { get; init; }
+
+        /// <summary>
+        /// 0 for the first emulator window, 1, 2… for more: those get a slightly
+        /// different MAC address (in memory only) so local wireless can tell
+        /// two copies started from the same firmware apart.
+        /// </summary>
+        public int MacInstance { get; init; }
     }
 
     /// <summary>
@@ -32,6 +46,9 @@ namespace Px86.NintendoDS.EmulatorCore
         private const int SaveFlushDelayFrames = 60;
 
         private int _framesSinceSaveChange = -1;
+        private int _framesSinceFirmwareChange = -1;
+        private byte[]? _firmwareMac;
+        private string? _firmwareWritesPath;
 
         private GameSession(NdsEmulator emulator, NdsRom rom, SaveMemory save, string romPath, string savePath)
         {
@@ -79,6 +96,28 @@ namespace Px86.NintendoDS.EmulatorCore
             if (emulator.UseRealBios && options.FirmwarePath == null)
                 emulator.UseRealBios = false;
 
+            session._firmwareWritesPath = options.FirmwareWritesPath;
+            if (options.FirmwareWritesPath != null && File.Exists(options.FirmwareWritesPath))
+            {
+                var written = File.ReadAllBytes(options.FirmwareWritesPath);
+                if (written.Length == FirmwareFlash.Size)
+                {
+                    emulator.LoadFirmware(written);
+                    session.Messages.Add($"Firmware changes from earlier sessions: {options.FirmwareWritesPath}.");
+                }
+            }
+            var firmware = emulator.Spi.Firmware;
+            session._firmwareMac = firmware.MacAddress;
+            if (options.MacInstance > 0)
+            {
+                var mac = firmware.MacAddress;
+                mac[5] ^= (byte)options.MacInstance;
+                mac[4] ^= 0x80;
+                firmware.SetMacAddress(mac);
+                session.Messages.Add($"Emulator window {options.MacInstance + 1}: MAC address {Convert.ToHexString(mac)} for local wireless.");
+            }
+            firmware.Modified += () => session._framesSinceFirmwareChange = 0;
+
             if (File.Exists(session.SavePath))
             {
                 session.Save.Load(File.ReadAllBytes(session.SavePath));
@@ -114,10 +153,27 @@ namespace Px86.NintendoDS.EmulatorCore
 
         private void OnFrame()
         {
+            if (_framesSinceFirmwareChange >= 0 && ++_framesSinceFirmwareChange >= SaveFlushDelayFrames)
+                FlushFirmware();
             if (_framesSinceSaveChange < 0)
                 return;
             if (++_framesSinceSaveChange >= SaveFlushDelayFrames)
                 FlushSave();
+        }
+
+        /// <summary>Write the firmware-writes file (with the original MAC address) if a game changed the firmware.</summary>
+        public void FlushFirmware()
+        {
+            if (_framesSinceFirmwareChange < 0 || _firmwareWritesPath == null)
+                return;
+            _framesSinceFirmwareChange = -1;
+            var copy = new FirmwareFlash(Emulator.Spi.Firmware.Data.ToArray());
+            if (_firmwareMac != null)
+                copy.SetMacAddress(_firmwareMac);
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_firmwareWritesPath))!);
+            string temp = _firmwareWritesPath + ".tmp";
+            File.WriteAllBytes(temp, copy.Data);
+            File.Move(temp, _firmwareWritesPath, overwrite: true);
         }
 
         /// <summary>Write the save file now if the game changed it.</summary>
@@ -180,6 +236,10 @@ namespace Px86.NintendoDS.EmulatorCore
             return true;
         }
 
-        public void Dispose() => FlushSave();
+        public void Dispose()
+        {
+            FlushSave();
+            FlushFirmware();
+        }
     }
 }

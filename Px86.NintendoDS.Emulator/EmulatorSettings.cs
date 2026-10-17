@@ -98,6 +98,20 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Folder for .sav files; empty = next to the ROM.</summary>
         public string? SaveDirectory { get; set; }
 
+        // ── Wireless ──────────────────────────────────────────────────────────
+
+        /// <summary>Off, local wireless between emulator windows, or local + the built-in access point (online).</summary>
+        public WirelessMode WirelessMode { get; set; } = WirelessMode.Off;
+
+        /// <summary>UDP port shared by every emulator window taking part in local wireless.</summary>
+        public int WirelessPort { get; set; } = EmulatorCore.Network.LocalWifiMedium.DefaultPort;
+
+        /// <summary>Also reach emulators on other machines in the local network.</summary>
+        public bool WirelessLan { get; set; }
+
+        /// <summary>DNS server the access point forwards to (a replacement Nintendo WFC service); empty = the PC's own.</summary>
+        public string? OnlineDns { get; set; }
+
         // ── Remote control (CodeDesigner, debuggers) ──────────────────────────
 
         /// <summary>Open the PINE socket in the window too (headless server mode always opens it).</summary>

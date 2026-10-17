@@ -24,6 +24,10 @@ namespace Px86.NintendoDS.Emulator
     ///     --gs-quality &lt;n&gt;      JPEG quality 1–100 (default 85)
     ///     --paused              Start paused (set breakpoints first, then resume over PINE)
     ///     --cpu &lt;mode&gt;          interpreter, cached or jit
+    ///     --wifi &lt;mode&gt;         off, local (other emulator windows) or online (+ built-in access point)
+    ///     --wifi-port &lt;n&gt;       UDP port for local wireless (default 7064)
+    ///     --wifi-lan            Local wireless across the LAN, not just this PC
+    ///     --dns &lt;ip&gt;            DNS server for online play (a replacement WFC service)
     ///     --trace-io            Log unhandled I/O register accesses
     ///     --save-settings       Store the given BIOS/firmware/scale options as defaults
     /// </summary>
@@ -48,6 +52,10 @@ namespace Px86.NintendoDS.Emulator
         public int? GsQuality { get; private set; }
         public bool Paused { get; private set; }
         public CpuMode? CpuMode { get; private set; }
+        public WirelessMode? Wireless { get; private set; }
+        public int? WirelessPort { get; private set; }
+        public bool WirelessLan { get; private set; }
+        public string? Dns { get; private set; }
         public string? ReplayGxPath { get; private set; }
 
         /// <summary>Headless without a fixed frame count: keep running and serve PINE/GS.</summary>
@@ -93,6 +101,19 @@ namespace Px86.NintendoDS.Emulator
                     case "--gs-codec": cl.GsCodec = Next(); break;
                     case "--gs-quality": cl.GsQuality = int.Parse(Next()); break;
                     case "--paused": cl.Paused = true; break;
+                    case "--wifi":
+                        string wifi = Next();
+                        cl.Wireless = wifi.ToLowerInvariant() switch
+                        {
+                            "off" => WirelessMode.Off,
+                            "local" => WirelessMode.Local,
+                            "online" => WirelessMode.Online,
+                            _ => throw new ArgumentException($"--wifi: unknown mode {wifi} (off, local or online)."),
+                        };
+                        break;
+                    case "--wifi-port": cl.WirelessPort = OptionalPort() ?? throw new ArgumentException("--wifi-port needs a port."); break;
+                    case "--wifi-lan": cl.WirelessLan = true; break;
+                    case "--dns": cl.Dns = Next(); break;
                     case "--cpu":
                         string mode = Next();
                         cl.CpuMode = mode.ToLowerInvariant() switch
@@ -150,6 +171,11 @@ namespace Px86.NintendoDS.Emulator
               --gs-quality <n>      GS stream JPEG quality 1-100 (default 85)
               --paused              Start paused (resume over PINE or with P)
               --cpu <mode>          interpreter, cached or jit (default: jit, from settings)
+              --wifi <mode>         off, local (trade/battle with other emulator windows) or
+                                    online (local + built-in access point for WFC replacements)
+              --wifi-port <n>       UDP port for local wireless (default 7064)
+              --wifi-lan            Local wireless across the LAN, not just this PC
+              --dns <ip>            DNS server for online play (a replacement WFC service)
               --replay-gx <file>    Re-render a GX capture (F9) to --screenshot (or <file>.png)
                                     and write a polygon/command dump to <file>.txt
               --trace-io            Log unhandled I/O register accesses

@@ -17,7 +17,12 @@ namespace Px86.NintendoDS.Emulator
         {
             _host = host;
             _launcher = launcher;
+            Wireless = new WirelessServices(host);
+            Wireless.Log += m => Log?.Invoke(m);
         }
+
+        /// <summary>Local wireless / online access for the emulated Wifi hardware.</summary>
+        public WirelessServices Wireless { get; }
 
         public PineSocket? Pine { get; private set; }
         public GsStreamSocket? Gs { get; private set; }
@@ -92,6 +97,7 @@ namespace Px86.NintendoDS.Emulator
         {
             StopPine();
             StopGs();
+            Wireless.Dispose();
         }
     }
 }

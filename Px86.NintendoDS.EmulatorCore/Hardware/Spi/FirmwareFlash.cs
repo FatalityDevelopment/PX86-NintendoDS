@@ -39,6 +39,9 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
 
         public byte[] Data => _data;
 
+        /// <summary>SSID of the emulator's software access point, preset as connection 1 in the generated firmware.</summary>
+        public const string AccessPointSsid = "Px86-AP";
+
         /// <summary>MAC address of the generated firmware (Nintendo's 00:09:BF prefix).</summary>
         public static readonly byte[] DefaultMac = { 0x00, 0x09, 0xBF, 0x12, 0x34, 0x56 };
 
@@ -260,8 +263,15 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(0x2C), 0x0138);
             UpdateWifiCrc(data);
 
-            // Access points: mark all three as unconfigured.
-            for (int ap = 0; ap < 3; ap++)
+            // Access points (GBATEK "DS Firmware Wifi Internet Access Points"): connection 1 is the
+            // emulator's own access point (open, everything by DHCP); 2 and 3 are unconfigured.
+            int slot1 = 0x3FA00;
+            Encoding.ASCII.GetBytes(AccessPointSsid).CopyTo(data, slot1 + 0x40);
+            data[slot1 + 0xE6] = 0;    // no WEP
+            data[slot1 + 0xE7] = 0;    // normal
+            data[slot1 + 0xEF] = 0x01; // connection 1 configured
+            BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(slot1 + 0xFE), Crc16.Compute(data.AsSpan(slot1, 0xFE), 0x0000));
+            for (int ap = 1; ap < 3; ap++)
                 data[0x3FA00 + ap * 0x100 + 0xE7] = 0xFF;
 
             byte[] settings = BuildUserSettings(profile);

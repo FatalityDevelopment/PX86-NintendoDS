@@ -154,6 +154,27 @@ whoever fixes the bug.
 `Px86.NintendoDS.Emulator --replay-gx file.gxcap` re-renders it without the game. It writes
 `file.png` and `file.txt`, a dump of every polygon and command.
 
+## Wireless: local play and online
+
+Settings > Network (or `--wifi local|online`) connects the emulated Wifi chip:
+
+- **Local wireless**: emulator windows link up for trades, battles and DS Download Play. Start the game in two
+  windows with the same UDP port (default 7064). Frames travel by UDP multicast on this PC. Tick "Also reach
+  emulators on other PCs" (or use `--wifi-lan`) to play across the LAN; your firewall may ask to allow it.
+  - The second and later windows on a PC get a slightly different MAC address, so two copies started from the
+    same firmware can see each other.
+  - There is no clock sync between the windows: a multiplayer host waits up to 30 ms (real time) for each
+    reply. Very timing-strict games may still drop the link.
+- **Online**: local wireless plus a built-in access point, `Px86-AP` (open, DHCP). It bridges the game to the
+  internet through a small NAT, so no administrator rights are needed.
+  - **No Nintendo servers:** Nintendo's own WFC servers are closed. Enter the DNS server of a replacement WFC
+    service under "DNS server" (or `--dns 1.2.3.4`).
+  - **Generated firmware:** connection 1 is already set to `Px86-AP`.
+  - **Your own firmware dump:** open the game's Nintendo WFC Settings once and use "Search for an Access Point".
+- **Firmware changes:** games store their WFC login and connection settings in the firmware. These changes are
+  saved next to `settings.json` (`firmware-*.bin`, one file per dump) and loaded the next time. Your dump file
+  itself is never written.
+
 ## Headless server (CodeDesigner and other tools)
 
 `Px86.NintendoDS.Emulator game.nds --headless` runs without a window and opens two local sockets:
@@ -163,6 +184,7 @@ whoever fixes the bug.
 Useful options:
 - `--paused` starts paused.
 - `--cpu interpreter|cached|jit` overrides the CPU mode from the settings.
+- `--wifi off|local|online`, `--wifi-port n`, `--wifi-lan` and `--dns ip` set up wireless (see above).
 - Leaving out the ROM starts an empty server that waits for a client to load one.
 - `--pine` / `--gs` open the sockets in the normal window too.
 

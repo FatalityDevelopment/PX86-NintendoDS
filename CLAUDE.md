@@ -39,7 +39,8 @@ Px86.NintendoDS.sln
 │   ├── Hosting/EmulatorHost.cs      # Runs the console on its own thread; thread-safe control (Invoke, pause, step…)
 │   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory access
 │   ├── Remote/                      # PINE socket (28013) + GS frame stream (28014), see docs/pine-protocol.md
-│   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, system control
+│   ├── Network/                     # Local wireless (UDP multicast), software access point + NAT router (online)
+│   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, Wifi/, system control
 │   ├── Cartridge/                   # Slot protocol, KEY1, save memory (EEPROM/FLASH/FRAM)
 │   ├── Bios/                        # HLE BIOS (SWIs), BIOS stubs, sound tables
 │   ├── Video/                       # LCD timing, VRAM banks, 2D engines, Gpu3D/

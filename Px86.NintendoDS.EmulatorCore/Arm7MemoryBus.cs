@@ -107,7 +107,7 @@ namespace Px86.NintendoDS.EmulatorCore
                     return MemoryAccess.Read32(memory, i);
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
+                    if (address >= 0x04800000u && address < 0x04810000u)
                         return _nds.Wifi.Read16(address) | ((uint)_nds.Wifi.Read16(address + 2) << 16);
                     return ReadIo32(address);
                 case 0x06: return _nds.Vram.Arm7.Read32(address);
@@ -131,7 +131,7 @@ namespace Px86.NintendoDS.EmulatorCore
                     return MemoryAccess.Read16(memory, i);
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
+                    if (address >= 0x04800000u && address < 0x04810000u)
                         return _nds.Wifi.Read16(address);
                     return ReadIo16(address);
                 case 0x06: return _nds.Vram.Arm7.Read16(address);
@@ -154,7 +154,7 @@ namespace Px86.NintendoDS.EmulatorCore
                     return memory[i];
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
+                    if (address >= 0x04800000u && address < 0x04810000u)
                         return (byte)(_nds.Wifi.Read16(address & ~1u) >> (int)((address & 1) * 8));
                     return ReadIo8(address);
                 case 0x06: return _nds.Vram.Arm7.Read8(address);
@@ -183,7 +183,7 @@ namespace Px86.NintendoDS.EmulatorCore
                     break;
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
+                    if (address >= 0x04800000u && address < 0x04810000u)
                     {
                         _nds.Wifi.Write16(address, (ushort)value);
                         _nds.Wifi.Write16(address + 2, (ushort)(value >> 16));
@@ -217,7 +217,7 @@ namespace Px86.NintendoDS.EmulatorCore
                     break;
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
+                    if (address >= 0x04800000u && address < 0x04810000u)
                         _nds.Wifi.Write16(address, value);
                     else
                         WriteIo16(address, value, 0xFFFF);
