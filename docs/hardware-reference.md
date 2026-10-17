@@ -55,6 +55,30 @@ WRAMCNT (ARM9 04000247h): 0 = 32K to ARM9, 1 = 2nd half ARM9 / 1st half ARM7, 2 
 | 04000300h | POSTFLG / HALTCNT | 9/7 | HALTCNT is ARM7 only |
 | 04000400h | Sound channels | 7 | 16 bytes × 16 |
 
+## Microphone (ARM7)
+
+The microphone is the TSC2046's AUX input (channel 6, single-ended: command E4h for 12-bit, ECh for 8-bit).
+Reply bits follow one dummy bit, MSB first: 12-bit V arrives as (V >> 5, V << 3), 8-bit as (V >> 1, V << 7).
+Silence is 800h. Power manager register 2 bit 0 switches the amplifier on; register 3 sets the gain
+(20×, 40×, 80×, 160×). `TouchScreen.Microphone` (an `IMicrophoneSource`) is sampled at the scheduler time
+of each read.
+
+## Wifi (ARM7)
+
+`EmulatorCore/Hardware/Wifi/WifiController.cs` documents the full register map (GBATEK "DS Wifi").
+
+- **Registers:** at 04808000h, mirrored at 04800000h. 8 KB packet RAM at 04804000h. 8-bit writes are ignored.
+- **RX ring:** BEGIN/END are Wifi-window addresses (4000h–6000h). WRCSR/READCSR/WR_ADDR are halfword offsets
+  into RAM. Each packet is a 12-byte RX header plus the frame, padded to 4 bytes.
+- **TX:** a 12-byte TX header plus the IEEE frame. The length counts the 4-byte FCS, which the hardware adds.
+  LOC3 goes first, LOC1 last.
+- **IF.24 is edge-triggered:** it is only set when W_IF & W_IE goes from 0 to non-zero.
+- **Timers:** the µs counter, W_BEACON_COUNT and W_POST_BEACON (1 ms units) drive IRQ13, IRQ14 and IRQ15.
+- **Multiplay:** the master sends a CMD (W_TXBUF_CMD); each slave in the body's slave mask answers with REPLY2;
+  the master sends the CMD ACK and raises IRQ12, which also fires when W_CMD_COUNT runs out.
+- **Firmware Wifi block (firmware 02Ah–163h):** MAC at 036h, RF type at 040h (2 = DS, 3 = DS-Lite), initial
+  W_CONFIG values at 044h–062h, BB values at 064h. Access point slots are at 3FA00h, 3FB00h and 3FC00h.
+
 ## Boot-time RAM locations (direct boot)
 027FF800h/027FFC00h chip ID ×2, header CRC, secure CRC · 027FFC40h boot indicator (1 = cartridge) ·
 027FFC80h firmware user settings · 027FFE00h cartridge header.

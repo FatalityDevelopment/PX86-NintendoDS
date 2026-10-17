@@ -10,8 +10,11 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
         /// <summary>Fetch and decode every instruction (simplest; always used while debugging).</summary>
         Interpreter,
 
-        /// <summary>Decode straight-line runs of code once and reuse them (same results, faster).</summary>
+        /// <summary>Decode straight-line runs of code once and reuse them (same results).</summary>
         Cached,
+
+        /// <summary>Like <see cref="Cached"/>, and blocks that run often are compiled to native code.</summary>
+        Jit,
     }
 
     /// <summary>
@@ -28,8 +31,24 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
         public ArmHandler[]? ArmHandlers;
         public ThumbHandler[]? ThumbHandlers;
 
+        /// <summary>Offset of the first opcode in the memory it was built from.</summary>
+        public int MemoryStart;
+
+        public int ByteLength => Count * (Thumb ? 2 : 4);
+
         /// <summary>Cleared when the memory it was built from is written.</summary>
         public bool Valid = true;
+
+        /// <summary>Times the block was entered (JIT mode compiles it at <see cref="JitThreshold"/>).</summary>
+        public int Runs;
+
+        /// <summary>Native version of the block, once compiled.</summary>
+        public JitBlockFunc? Compiled;
+
+        /// <summary>Compiling failed or isn't worth it; keep interpreting.</summary>
+        public bool NoJit;
+
+        public const int JitThreshold = 32;
     }
 
     /// <summary>

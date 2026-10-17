@@ -2,11 +2,12 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
 {
     /// <summary>
     /// Remembers which 256-byte pages of executable RAM (main RAM, shared
-    /// WRAM, ARM7 WRAM, ITCM) hold cached blocks, so a write into one of them —
-    /// self-modifying code, an overlay loaded by DMA or the cartridge, a cheat
-    /// — invalidates exactly the blocks built from it. The buses call
+    /// WRAM, ARM7 WRAM, ITCM) hold cached blocks, so a write over a block's
+    /// bytes — self-modifying code, an overlay loaded by DMA or the cartridge,
+    /// a cheat — invalidates exactly that block. The buses call
     /// <see cref="OnWrite"/> on their RAM write paths; the check is one array
-    /// lookup when the page holds no code.
+    /// lookup when the page holds no code. Data that shares a page with code
+    /// (small variables, literal pools) only costs a scan of that page's blocks.
     /// </summary>
     public sealed class CodeTracker
     {
@@ -53,10 +54,14 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
                 return; // read-only (BIOS): never invalidated
             int page = index >> PageShift;
             region.HasCode[page] = true;
+            block.MemoryStart = index;
             (region.Blocks[page] ??= new List<CachedBlock>()).Add(block);
         }
 
-        /// <summary>A write hit <paramref name="memory"/>[<paramref name="index"/>]. Call only for tracked memory.</summary>
+        /// <summary>
+        /// A write of up to 4 bytes hit <paramref name="memory"/>[<paramref name="index"/>…]
+        /// (index aligned to the access size, so the bytes never cross a page).
+        /// </summary>
         public void OnWrite(byte[] memory, int index)
         {
             var region = Find(memory);
@@ -65,12 +70,26 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
             int page = index >> PageShift;
             if ((uint)page >= (uint)region.HasCode.Length || !region.HasCode[page])
                 return;
-            region.HasCode[page] = false;
             var blocks = region.Blocks[page];
-            region.Blocks[page] = null;
-            if (blocks != null)
-                foreach (var b in blocks)
+            if (blocks == null)
+            {
+                region.HasCode[page] = false;
+                return;
+            }
+            for (int i = blocks.Count - 1; i >= 0; i--)
+            {
+                var b = blocks[i];
+                if (index < b.MemoryStart + b.ByteLength && index + 4 > b.MemoryStart)
+                {
                     b.Valid = false;
+                    blocks.RemoveAt(i);
+                }
+            }
+            if (blocks.Count == 0)
+            {
+                region.Blocks[page] = null;
+                region.HasCode[page] = false;
+            }
         }
 
         /// <summary>Fast path for main RAM writes (the overwhelmingly common case).</summary>

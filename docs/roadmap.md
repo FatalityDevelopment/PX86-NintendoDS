@@ -4,7 +4,7 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| ARM9/ARM7 interpreter | ✅ Done | All ARMv4T/ARMv5TE instructions; no JIT yet |
+| ARM9/ARM7 interpreter + JIT | ✅ Done | All ARMv4T/ARMv5TE instructions; IL JIT for hot blocks (~2x) |
 | CP15 / TCM | ✅ Done | Protection unit registers stored, not enforced; caches not modelled |
 | Memory buses, WRAM/VRAM banking | ✅ Done | |
 | IRQ, timers, DMA, IPC, maths, keypad | ✅ Done | DMA runs to completion when triggered |
@@ -17,8 +17,9 @@
 | 3D engine | ✅ Done | Geometry engine, clipping, lighting, all texture formats, software rasterizer; no anti-aliasing or 1-dot depth culling |
 | Sound (SPU) | ✅ Done | 16 channels, PCM/ADPCM/PSG/noise, capture, OpenAL output |
 | Save states | ✅ Done | 10 slots per game (F5/F8); determinism covered by tests |
-| Performance work | ⏳ Planned | Interpreter fast paths, memory page tables, maybe a JIT |
-| Wifi / microphone | ⏳ Later | Stubbed |
+| Performance work | 🔄 Ongoing | JIT done; next: register caching in JIT blocks, memory page tables |
+| Wifi | ✅ Done | MAC/BB/RF chips, local wireless (UDP), multiplay CMD/REPLY, online via soft AP + NAT |
+| Microphone | ✅ Done | TSC channel 6 from the PC microphone (SDL capture), blow key, PM amplifier/gain |
 
 ## Compatibility
 

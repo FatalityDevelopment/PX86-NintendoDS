@@ -55,13 +55,22 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Output volume, 0–100.</summary>
         public int Volume { get; set; } = 100;
 
+        /// <summary>Record the PC's microphone for games that listen (blowing, shouting). The blow key works either way.</summary>
+        public bool MicrophoneEnabled { get; set; } = true;
+
+        /// <summary>Capture device name; empty = the system default.</summary>
+        public string? MicrophoneDevice { get; set; }
+
+        /// <summary>Software gain on the recorded sound, in percent.</summary>
+        public int MicrophoneGain { get; set; } = 100;
+
         // ── Emulation ─────────────────────────────────────────────────────────
 
         /// <summary>Speed of the "turbo" limiter mode, in percent.</summary>
         public int TurboPercent { get; set; } = 200;
 
-        /// <summary>How the CPUs run code (interpreter or decoded-block cache). The debugger always interprets.</summary>
-        public CpuMode CpuMode { get; set; } = CpuMode.Interpreter;
+        /// <summary>How the CPUs run code. The JIT gives the same results, faster; the debugger always interprets.</summary>
+        public CpuMode CpuMode { get; set; } = CpuMode.Jit;
 
         /// <summary>Most recently opened ROMs, newest first.</summary>
         public List<string> RecentRoms { get; set; } = new();
@@ -98,6 +107,20 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Folder for .sav files; empty = next to the ROM.</summary>
         public string? SaveDirectory { get; set; }
 
+        // ── Wireless ──────────────────────────────────────────────────────────
+
+        /// <summary>Off, local wireless between emulator windows, or local + the built-in access point (online).</summary>
+        public WirelessMode WirelessMode { get; set; } = WirelessMode.Off;
+
+        /// <summary>UDP port shared by every emulator window taking part in local wireless.</summary>
+        public int WirelessPort { get; set; } = EmulatorCore.Network.LocalWifiMedium.DefaultPort;
+
+        /// <summary>Also reach emulators on other machines in the local network.</summary>
+        public bool WirelessLan { get; set; }
+
+        /// <summary>DNS server the access point forwards to (a replacement Nintendo WFC service); empty = the PC's own.</summary>
+        public string? OnlineDns { get; set; }
+
         // ── Remote control (CodeDesigner, debuggers) ──────────────────────────
 
         /// <summary>Open the PINE socket in the window too (headless server mode always opens it).</summary>
@@ -128,6 +151,7 @@ namespace Px86.NintendoDS.Emulator
             ["A"] = "Y",
             ["Q"] = "L",
             ["W"] = "R",
+            ["B"] = "Mic",
             ["Enter"] = "Start",
             ["Backspace"] = "Select",
             ["ShiftRight"] = "Select",

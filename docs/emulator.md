@@ -34,7 +34,7 @@ The menu bar sits at the top of the window. Esc hides it, for example in fullscr
 | Audio | Sound on/off, volume |
 | Input | Rebind each DS button by clicking it and pressing a key |
 | Firmware user | Nickname, message, birthday, language, favourite colour (used when no firmware dump is set) |
-| Emulation | Turbo speed, CPU mode (Interpreter or Cached; identical results, the debugger always interprets) |
+| Emulation | Turbo speed, CPU mode: JIT (default, about 2x the interpreter), Cached or Interpreter. All give identical results; the debugger always interprets |
 | Remote | PINE and GS stream sockets: on/off, ports, format, JPEG quality |
 
 Use your own legally made dumps of your cartridges. Nothing copyrighted ships with the emulator.
@@ -61,6 +61,7 @@ With a firmware dump, your nickname, language and touch-screen calibration come 
 | L / R | Q / W | Shoulders |
 | Start / Select | Enter / Backspace | Start / Back |
 | Touch screen | Left mouse button on the bottom screen | — |
+| Blow into the microphone | Hold B (the "Mic" binding) | Left trigger |
 | Fast-forward | Hold Tab | Right trigger |
 | Pause / frame advance | P / N | — |
 | Reset | Ctrl+R | — |
@@ -154,6 +155,34 @@ whoever fixes the bug.
 `Px86.NintendoDS.Emulator --replay-gx file.gxcap` re-renders it without the game. It writes
 `file.png` and `file.txt`, a dump of every polygon and command.
 
+## Microphone
+
+Games that listen (blowing out candles, shouting) hear the PC's microphone, recorded at 16 kHz through
+SDL. Pick the device and an input gain in **Settings → Audio**. Without a microphone, hold the **Mic**
+key (B by default) or the gamepad's left trigger to send loud noise. The game must switch the DS
+microphone amplifier on itself, as on real hardware.
+
+## Wireless: local play and online
+
+Settings > Network (or `--wifi local|online`) connects the emulated Wifi chip:
+
+- **Local wireless**: emulator windows link up for trades, battles and DS Download Play. Start the game in two
+  windows with the same UDP port (default 7064). Frames travel by UDP multicast on this PC. Tick "Also reach
+  emulators on other PCs" (or use `--wifi-lan`) to play across the LAN; your firewall may ask to allow it.
+  - The second and later windows on a PC get a slightly different MAC address, so two copies started from the
+    same firmware can see each other.
+  - There is no clock sync between the windows: a multiplayer host waits up to 30 ms (real time) for each
+    reply. Very timing-strict games may still drop the link.
+- **Online**: local wireless plus a built-in access point, `Px86-AP` (open, DHCP). It bridges the game to the
+  internet through a small NAT, so no administrator rights are needed.
+  - **No Nintendo servers:** Nintendo's own WFC servers are closed. Enter the DNS server of a replacement WFC
+    service under "DNS server" (or `--dns 1.2.3.4`).
+  - **Generated firmware:** connection 1 is already set to `Px86-AP`.
+  - **Your own firmware dump:** open the game's Nintendo WFC Settings once and use "Search for an Access Point".
+- **Firmware changes:** games store their WFC login and connection settings in the firmware. These changes are
+  saved next to `settings.json` (`firmware-*.bin`, one file per dump) and loaded the next time. Your dump file
+  itself is never written.
+
 ## Headless server (CodeDesigner and other tools)
 
 `Px86.NintendoDS.Emulator game.nds --headless` runs without a window and opens two local sockets:
@@ -162,6 +191,8 @@ whoever fixes the bug.
 
 Useful options:
 - `--paused` starts paused.
+- `--cpu interpreter|cached|jit` overrides the CPU mode from the settings.
+- `--wifi off|local|online`, `--wifi-port n`, `--wifi-lan` and `--dns ip` set up wireless (see above).
 - Leaving out the ROM starts an empty server that waits for a client to load one.
 - `--pine` / `--gs` open the sockets in the normal window too.
 

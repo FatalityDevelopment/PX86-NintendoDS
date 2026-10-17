@@ -19,15 +19,18 @@ namespace Px86.NintendoDS.Emulator.Ui
         private static readonly string[] Rotations = { "0 deg", "90 deg", "180 deg", "270 deg" };
         private static readonly string[] Languages = { "Japanese", "English", "French", "German", "Italian", "Spanish" };
         private static readonly string[] Codecs = { "jpeg", "png", "raw" };
-        private static readonly NdsButton[] Buttons =
+        private static readonly string[] Buttons =
         {
-            NdsButton.Up, NdsButton.Down, NdsButton.Left, NdsButton.Right, NdsButton.A, NdsButton.B,
-            NdsButton.X, NdsButton.Y, NdsButton.L, NdsButton.R, NdsButton.Start, NdsButton.Select,
+            nameof(NdsButton.Up), nameof(NdsButton.Down), nameof(NdsButton.Left), nameof(NdsButton.Right), nameof(NdsButton.A), nameof(NdsButton.B),
+            nameof(NdsButton.X), nameof(NdsButton.Y), nameof(NdsButton.L), nameof(NdsButton.R), nameof(NdsButton.Start), nameof(NdsButton.Select),
+            InputMapper.MicBinding,
         };
 
         private readonly UiContext _ui;
         private bool _open;
-        private NdsButton? _rebinding;
+        private string? _rebinding;
+
+        private List<string>? _micDevices;
 
         public SettingsWindow(UiContext ui) => _ui = ui;
 
@@ -47,9 +50,9 @@ namespace Px86.NintendoDS.Emulator.Ui
             if (key == Key.Escape)
                 return;
             var bindings = _ui.Settings.KeyBindings;
-            foreach (var stale in bindings.Where(b => b.Value.Equals(button.ToString(), StringComparison.OrdinalIgnoreCase) || b.Key == key.ToString()).Select(b => b.Key).ToList())
+            foreach (var stale in bindings.Where(b => b.Value.Equals(button, StringComparison.OrdinalIgnoreCase) || b.Key == key.ToString()).Select(b => b.Key).ToList())
                 bindings.Remove(stale);
-            bindings[key.ToString()] = button.ToString();
+            bindings[key.ToString()] = button;
             _ui.ApplyInput();
         }
 
@@ -71,6 +74,7 @@ namespace Px86.NintendoDS.Emulator.Ui
                     Tab("Input", InputTab);
                     Tab("Firmware user", FirmwareTab);
                     Tab("Emulation", EmulationTab);
+                    Tab("Network", NetworkTab);
                     Tab("Remote", RemoteTab);
                     ImGui.EndTabBar();
                 }
@@ -198,6 +202,33 @@ namespace Px86.NintendoDS.Emulator.Ui
                 s.Volume = volume;
                 _ui.ApplyAudio();
             }
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Microphone");
+            bool mic = s.MicrophoneEnabled;
+            if (ImGui.Checkbox("Use the PC microphone", ref mic))
+            {
+                s.MicrophoneEnabled = mic;
+                _ui.ApplyAudio();
+            }
+            _micDevices ??= MicrophoneCapture.ListDevices();
+            var devices = new[] { "System default" }.Concat(_micDevices.Select(Notifications.Ascii)).ToArray();
+            int device = Math.Max(0, _micDevices.IndexOf(s.MicrophoneDevice ?? "") + 1);
+            if (ImGui.Combo("Device", ref device, devices, devices.Length))
+            {
+                s.MicrophoneDevice = device == 0 ? null : _micDevices[device - 1];
+                _ui.ApplyAudio();
+            }
+            int gain = s.MicrophoneGain;
+            if (ImGui.SliderInt("Input gain", ref gain, 25, 400, "%d%%"))
+            {
+                s.MicrophoneGain = gain;
+                _ui.ApplyAudio();
+            }
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+            ImGui.TextWrapped(_ui.MicrophoneStatus());
+            ImGui.TextWrapped("No microphone? Hold the Mic (blow) key, default B, or the left trigger.");
+            ImGui.PopStyleColor();
         }
 
         private void InputTab()
@@ -212,9 +243,9 @@ namespace Px86.NintendoDS.Emulator.Ui
                 {
                     ImGui.TableNextRow();
                     ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(button.ToString());
+                    ImGui.TextUnformatted(button == InputMapper.MicBinding ? "Mic (blow)" : button);
                     ImGui.TableNextColumn();
-                    var keys = bindings.Where(b => b.Value.Equals(button.ToString(), StringComparison.OrdinalIgnoreCase)).Select(b => b.Key).ToList();
+                    var keys = bindings.Where(b => b.Value.Equals(button, StringComparison.OrdinalIgnoreCase)).Select(b => b.Key).ToList();
                     string label = _rebinding == button ? "press a key..." : keys.Count == 0 ? "(none)" : string.Join(", ", keys);
                     if (ImGui.Button($"{label}##{button}", new Vector2(-1, 0)))
                         _rebinding = button;
@@ -227,6 +258,7 @@ namespace Px86.NintendoDS.Emulator.Ui
                 _ui.ApplyInput();
             }
             ImGui.TextDisabled("Tab = fast-forward, P = pause, F5/F8 = save/load state, F9 = GX capture, F12 = screenshot.");
+            ImGui.TextDisabled("Mic (blow) and the gamepad's left trigger send loud noise into the microphone.");
         }
 
         private void FirmwareTab()
@@ -269,10 +301,62 @@ namespace Px86.NintendoDS.Emulator.Ui
                 s.CpuMode = (CpuMode)mode;
                 _ui.Host.Invoke(() => { if (_ui.Host.Emulator is { } nds) nds.CpuMode = s.CpuMode; });
             }
-            ImGui.TextDisabled("Cached decodes runs of code once. Results are identical; the debugger always interprets.");
+            ImGui.TextDisabled("JIT compiles hot code to native code (about 2x faster). All modes give identical results;");
+            ImGui.TextDisabled("the debugger always interprets. Switch to Interpreter if a game misbehaves only with the JIT.");
         }
 
-        private static readonly string[] CpuModes = { "Interpreter", "Cached" };
+        private static readonly string[] CpuModes = { "Interpreter", "Cached", "JIT" };
+
+        private static readonly string[] WirelessModes = { "Off", "Local wireless", "Local wireless + online" };
+
+        private void NetworkTab()
+        {
+            var s = _ui.Settings;
+            var wireless = _ui.Remote.Wireless;
+            ImGui.TextWrapped("Local wireless links emulator windows for trades, battles and DS Download Play: start the " +
+                              "game in two windows (on this PC, or on the LAN with the option below) with the same port.");
+            ImGui.TextWrapped("Online adds a built-in access point, \"" + EmulatorCore.Network.SoftAccessPoint.Ssid + "\". Nintendo's own " +
+                              "WFC servers are closed: set the DNS server of a replacement service. With your own firmware, " +
+                              "pick the access point once in the game's Nintendo WFC Settings (Search for an Access Point).");
+            ImGui.Spacing();
+
+            int mode = (int)s.WirelessMode;
+            ImGui.Combo("Mode", ref mode, WirelessModes, WirelessModes.Length);
+            s.WirelessMode = (WirelessMode)mode;
+            int port = s.WirelessPort;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.InputInt("UDP port", ref port))
+                s.WirelessPort = Math.Clamp(port, 1024, 65535);
+            bool lan = s.WirelessLan;
+            if (ImGui.Checkbox("Also reach emulators on other PCs in the local network", ref lan))
+                s.WirelessLan = lan;
+            string dns = s.OnlineDns ?? "";
+            ImGui.SetNextItemWidth(200);
+            if (ImGui.InputText("DNS server (online)", ref dns, 64))
+                s.OnlineDns = string.IsNullOrWhiteSpace(dns) ? null : dns.Trim();
+            ImGui.TextDisabled("Empty = this PC's DNS. Example format: 1.2.3.4");
+
+            if (ImGui.Button("Apply"))
+            {
+                if (s.WirelessMode == WirelessMode.Online && s.OnlineDns != null && EmulatorCore.Network.OnlineWifiMedium.ParseDns(s.OnlineDns) == null)
+                    _ui.Notifications.Add("The DNS server must be an IP address like 1.2.3.4.");
+                else
+                {
+                    wireless.Apply(s.WirelessMode, s.WirelessPort, s.WirelessLan, s.OnlineDns);
+                    _ui.Launcher.TrySaveSettings();
+                }
+            }
+
+            ImGui.Separator();
+            ImGui.TextUnformatted($"Now: {WirelessModes[(int)wireless.Mode]}. This is emulator window {WirelessServices.InstanceNumber + 1}" +
+                                  (WirelessServices.InstanceNumber > 0 ? " (it uses its own MAC address)." : "."));
+            if (wireless.Mode != WirelessMode.Off)
+                ImGui.TextDisabled($"Other consoles heard recently: {wireless.PeerCount()}.");
+            if (wireless.Online is { } online)
+                ImGui.TextDisabled($"Access point: {online.AccessPoint.AssociatedStations} console(s) connected, {online.Router.OpenConnections} open connection(s).");
+            if (_ui.Host.Emulator is { } nds)
+                ImGui.TextDisabled($"Wifi frames sent {nds.Wifi.FramesSent}, received {nds.Wifi.FramesReceived}.");
+        }
 
         private void RemoteTab()
         {

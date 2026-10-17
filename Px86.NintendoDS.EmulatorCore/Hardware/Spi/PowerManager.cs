@@ -24,6 +24,12 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             Reset();
         }
 
+        /// <summary>Register 2 bit 0: the microphone amplifier is on.</summary>
+        public bool MicrophoneAmplifierOn => (_registers[2] & 1) != 0;
+
+        /// <summary>Register 3: amplifier gain 0–3 (20×, 40×, 80×, 160×).</summary>
+        public int MicrophoneGain => _registers[3] & 3;
+
         /// <summary>Raised when software writes the power-off bit.</summary>
         public event Action? PowerOffRequested;
 

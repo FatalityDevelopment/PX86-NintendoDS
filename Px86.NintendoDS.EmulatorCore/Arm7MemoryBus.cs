@@ -17,7 +17,7 @@ namespace Px86.NintendoDS.EmulatorCore
     ///   03000000h  Shared WRAM, ARM7 view (WRAMCNT: none → mirrors ARM7 WRAM, 1st 16K, 2nd 16K, 32K)
     ///   03800000h  ARM7 WRAM 64 KB (mirrored to 03FFFFFFh)
     ///   04000000h  I/O ports
-    ///   04800000h  Wifi registers and 8 KB Wifi RAM (stubbed)
+    ///   04800000h  Wifi registers and 8 KB Wifi RAM (<see cref="Hardware.Wifi.WifiController"/>)
     ///   06000000h  VRAM banks C/D when mapped to the ARM7 (MST 2)
     ///   08000000h  GBA slot (open bus)
     ///
@@ -26,8 +26,6 @@ namespace Px86.NintendoDS.EmulatorCore
     public sealed class Arm7MemoryBus : IArmMemoryBus
     {
         private readonly NdsEmulator _nds;
-        private readonly byte[] _wifiRam = new byte[0x2000];
-        private readonly ushort[] _wifiRegisters = new ushort[0x800];
 
         public Arm7MemoryBus(NdsEmulator nds)
         {
@@ -38,16 +36,11 @@ namespace Px86.NintendoDS.EmulatorCore
 
         public void Reset()
         {
-            Array.Clear(_wifiRam);
-            Array.Clear(_wifiRegisters);
-            _wifiRegisters[0] = 0xC340; // W_ID: DS-Lite wifi chip
         }
 
         public void Serialize(StateSerializer s)
         {
             s.Section("Arm7Bus");
-            s.Sync(_wifiRam);
-            s.Sync(_wifiRegisters);
         }
 
         // ── Shared WRAM view ──────────────────────────────────────────────────
@@ -114,8 +107,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     return MemoryAccess.Read32(memory, i);
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
-                        return ReadWifi16(address) | ((uint)ReadWifi16(address + 2) << 16);
+                    if (address >= 0x04800000u && address < 0x04810000u)
+                        return _nds.Wifi.Read16(address) | ((uint)_nds.Wifi.Read16(address + 2) << 16);
                     return ReadIo32(address);
                 case 0x06: return _nds.Vram.Arm7.Read32(address);
                 case 0x08:
@@ -138,8 +131,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     return MemoryAccess.Read16(memory, i);
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
-                        return ReadWifi16(address);
+                    if (address >= 0x04800000u && address < 0x04810000u)
+                        return _nds.Wifi.Read16(address);
                     return ReadIo16(address);
                 case 0x06: return _nds.Vram.Arm7.Read16(address);
                 case 0x08:
@@ -161,8 +154,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     return memory[i];
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
-                        return (byte)(ReadWifi16(address & ~1u) >> (int)((address & 1) * 8));
+                    if (address >= 0x04800000u && address < 0x04810000u)
+                        return (byte)(_nds.Wifi.Read16(address & ~1u) >> (int)((address & 1) * 8));
                     return ReadIo8(address);
                 case 0x06: return _nds.Vram.Arm7.Read8(address);
                 case 0x0A: return 0xFF;
@@ -190,10 +183,10 @@ namespace Px86.NintendoDS.EmulatorCore
                     break;
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
+                    if (address >= 0x04800000u && address < 0x04810000u)
                     {
-                        WriteWifi16(address, (ushort)value);
-                        WriteWifi16(address + 2, (ushort)(value >> 16));
+                        _nds.Wifi.Write16(address, (ushort)value);
+                        _nds.Wifi.Write16(address + 2, (ushort)(value >> 16));
                     }
                     else
                     {
@@ -224,8 +217,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     break;
                 }
                 case 0x04:
-                    if (address >= 0x04800000u)
-                        WriteWifi16(address, value);
+                    if (address >= 0x04800000u && address < 0x04810000u)
+                        _nds.Wifi.Write16(address, value);
                     else
                         WriteIo16(address, value, 0xFFFF);
                     break;
@@ -257,27 +250,6 @@ namespace Px86.NintendoDS.EmulatorCore
                     break;
                 case 0x06: _nds.Vram.Arm7.Write8(address, value); break; // ARM7 may byte-write its VRAM
             }
-        }
-
-        // ── Wifi (stub) ───────────────────────────────────────────────────────
-
-        private ushort ReadWifi16(uint address)
-        {
-            uint offset = address & 0x7FFF;
-            if (offset >= 0x4000 && offset < 0x6000)
-                return MemoryAccess.Read16(_wifiRam, (int)(offset - 0x4000));
-            if (offset < 0x1000)
-                return _wifiRegisters[offset >> 1];
-            return 0;
-        }
-
-        private void WriteWifi16(uint address, ushort value)
-        {
-            uint offset = address & 0x7FFF;
-            if (offset >= 0x4000 && offset < 0x6000)
-                MemoryAccess.Write16(_wifiRam, (int)(offset - 0x4000), value);
-            else if (offset > 0 && offset < 0x1000)
-                _wifiRegisters[offset >> 1] = value;
         }
 
         // ── I/O ───────────────────────────────────────────────────────────────

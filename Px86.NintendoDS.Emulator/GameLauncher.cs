@@ -31,6 +31,9 @@ namespace Px86.NintendoDS.Emulator
             Bios7Path = NullIfEmpty(_settings.Bios7Path),
             FirmwarePath = NullIfEmpty(_settings.FirmwarePath),
             UseRealBios = _settings.UseRealBios,
+            CpuMode = _settings.CpuMode,
+            FirmwareWritesPath = FirmwareWritesPathFor(NullIfEmpty(_settings.FirmwarePath)),
+            MacInstance = WirelessServices.InstanceNumber,
             Profile = new FirmwareFlash.UserProfile
             {
                 Nickname = string.IsNullOrWhiteSpace(_settings.Nickname) ? "Px86" : _settings.Nickname,
@@ -48,7 +51,6 @@ namespace Px86.NintendoDS.Emulator
             var session = Start(OptionsFor(romPath, savePath));
             if (session == null)
                 return false;
-            session.Emulator.CpuMode = _settings.CpuMode;
             _host.Attach(session);
             _settings.AddRecentRom(romPath);
             TrySaveSettings();
@@ -84,6 +86,19 @@ namespace Px86.NintendoDS.Emulator
             {
                 Message?.Invoke($"Could not save settings: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Firmware changes (WFC login, access point settings) live next to the
+        /// settings file, one file per firmware dump, so the dump itself is never touched.
+        /// </summary>
+        private static string FirmwareWritesPathFor(string? firmwarePath)
+        {
+            string name = firmwarePath == null
+                ? "generated"
+                : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                      System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(firmwarePath).ToLowerInvariant())))[..12];
+            return Path.Combine(Path.GetDirectoryName(EmulatorSettings.DefaultPath)!, $"firmware-{name}.bin");
         }
 
         private string? SavePathFor(string romPath)

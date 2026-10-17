@@ -7,6 +7,7 @@ using Px86.NintendoDS.EmulatorCore.Cartridge;
 using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
+using Px86.NintendoDS.EmulatorCore.Hardware.Wifi;
 using Px86.NintendoDS.EmulatorCore.Jit;
 using Px86.NintendoDS.EmulatorCore.Video;
 using Px86.NintendoDS.EmulatorCore.Video.Gpu3D;
@@ -84,6 +85,9 @@ namespace Px86.NintendoDS.EmulatorCore
             Rtc = new RealTimeClock();
             Control = new SystemControl();
             Spi = new SpiBus(Irq7, new PowerManager(), FirmwareFlash.CreateDefault(), new TouchScreen());
+            Wifi = new WifiController(Scheduler, Irq7);
+            Spi.Touch.Clock = () => Scheduler.CurrentTime;
+            Spi.Touch.Amplifier = () => (Spi.Power.MicrophoneAmplifierOn, Spi.Power.MicrophoneGain);
             Cartridge = new CartridgeSlot(Scheduler, Irq9, Irq7, Dma9, Dma7);
             Lcd = new LcdController(Scheduler, Irq9, Irq7, Dma9, Dma7);
             EngineA = new Gpu2DEngine(true, Vram, Palette, Oam);
@@ -135,6 +139,9 @@ namespace Px86.NintendoDS.EmulatorCore
 
         /// <summary>Number of blocks built so far (both CPUs), for diagnostics.</summary>
         public long BlocksCompiled => _blocks9.Compiles + _blocks7.Compiles;
+
+        /// <summary>Blocks compiled to native code (JIT mode).</summary>
+        public long JitCompiles { get; private set; }
         public ArmCpu Arm9 { get; }
         public ArmCpu Arm7 { get; }
         public Cp15 Cp15 { get; }
@@ -162,6 +169,9 @@ namespace Px86.NintendoDS.EmulatorCore
         public RealTimeClock Rtc { get; }
         public SystemControl Control { get; }
         public SpiBus Spi { get; }
+
+        /// <summary>The ARM7's Wifi hardware; set <see cref="WifiController.Medium"/> to connect it.</summary>
+        public WifiController Wifi { get; }
         public CartridgeSlot Cartridge { get; }
         public LcdController Lcd { get; }
         public Gpu2DEngine EngineA { get; }
@@ -245,6 +255,9 @@ namespace Px86.NintendoDS.EmulatorCore
             Rtc.Reset();
             Control.Reset();
             Spi.Reset();
+            // The firmware's RF type tells which console it came from: 2 = DS (MM3155 + RF9008), 3 = DS-Lite.
+            Wifi.ChipId = Spi.Firmware.Data[0x40] == 2 ? (ushort)0x1440 : (ushort)0xC340;
+            Wifi.Reset();
             Cartridge.Reset();
             EngineA.Reset();
             EngineB.Reset();
@@ -283,7 +296,7 @@ namespace Px86.NintendoDS.EmulatorCore
         // ── Save states ───────────────────────────────────────────────────────
 
         public const string StateMagic = "PX86-NDS-STATE";
-        public const int StateVersion = 1;
+        public const int StateVersion = 2;
 
         /// <summary>Write the complete machine state (memory, CPUs, every device) to <paramref name="stream"/>.</summary>
         public void SaveState(Stream stream) => SerializeState(StateSerializer.ForWriting(stream));
@@ -351,6 +364,7 @@ namespace Px86.NintendoDS.EmulatorCore
             Rtc.Serialize(s);
             Control.Serialize(s);
             Spi.Serialize(s);
+            Wifi.Serialize(s);
             Cartridge.Serialize(s);
             Lcd.Serialize(s);
             EngineA.Serialize(s);
@@ -490,7 +504,7 @@ namespace Px86.NintendoDS.EmulatorCore
                 target = Scheduler.Now + 1;
             var debug = _debugger;
 
-            bool cached = CpuMode == CpuMode.Cached && debug == null;
+            bool cached = CpuMode != CpuMode.Interpreter && debug == null;
 
             // ARM9
             WakeIfPending(Arm9, Irq9);
@@ -558,6 +572,25 @@ namespace Px86.NintendoDS.EmulatorCore
         /// </summary>
         private long RunBlock(ArmCpu cpu, CachedBlock block, long time, long target, DmaController dma, int clock)
         {
+            if (block.Compiled != null)
+                return block.Compiled(cpu, block, Scheduler, dma, time, target);
+            if (CpuMode == CpuMode.Jit && !block.NoJit && ++block.Runs >= CachedBlock.JitThreshold)
+            {
+                // A compiler bug must not stop the game: such a block stays interpreted.
+                // Invalid IL is reported on the first call, before any instruction runs.
+                try
+                {
+                    var compiled = JitCompiler.Compile(block, clock);
+                    long end = compiled(cpu, block, Scheduler, dma, time, target);
+                    block.Compiled = compiled;
+                    JitCompiles++;
+                    return end;
+                }
+                catch (InvalidProgramException)
+                {
+                    block.NoJit = true;
+                }
+            }
             uint expected = block.Address;
             uint size = block.Thumb ? 2u : 4u;
             var opcodes = block.Opcodes;

@@ -1,3 +1,5 @@
+using Px86.NintendoDS.EmulatorCore.Jit;
+
 namespace Px86.NintendoDS.Emulator
 {
     /// <summary>
@@ -21,6 +23,11 @@ namespace Px86.NintendoDS.Emulator
     ///     --gs-codec &lt;c&gt;        jpeg (default), png or raw
     ///     --gs-quality &lt;n&gt;      JPEG quality 1–100 (default 85)
     ///     --paused              Start paused (set breakpoints first, then resume over PINE)
+    ///     --cpu &lt;mode&gt;          interpreter, cached or jit
+    ///     --wifi &lt;mode&gt;         off, local (other emulator windows) or online (+ built-in access point)
+    ///     --wifi-port &lt;n&gt;       UDP port for local wireless (default 7064)
+    ///     --wifi-lan            Local wireless across the LAN, not just this PC
+    ///     --dns &lt;ip&gt;            DNS server for online play (a replacement WFC service)
     ///     --trace-io            Log unhandled I/O register accesses
     ///     --save-settings       Store the given BIOS/firmware/scale options as defaults
     /// </summary>
@@ -44,6 +51,11 @@ namespace Px86.NintendoDS.Emulator
         public string? GsCodec { get; private set; }
         public int? GsQuality { get; private set; }
         public bool Paused { get; private set; }
+        public CpuMode? CpuMode { get; private set; }
+        public WirelessMode? Wireless { get; private set; }
+        public int? WirelessPort { get; private set; }
+        public bool WirelessLan { get; private set; }
+        public string? Dns { get; private set; }
         public string? ReplayGxPath { get; private set; }
 
         /// <summary>Headless without a fixed frame count: keep running and serve PINE/GS.</summary>
@@ -89,6 +101,29 @@ namespace Px86.NintendoDS.Emulator
                     case "--gs-codec": cl.GsCodec = Next(); break;
                     case "--gs-quality": cl.GsQuality = int.Parse(Next()); break;
                     case "--paused": cl.Paused = true; break;
+                    case "--wifi":
+                        string wifi = Next();
+                        cl.Wireless = wifi.ToLowerInvariant() switch
+                        {
+                            "off" => WirelessMode.Off,
+                            "local" => WirelessMode.Local,
+                            "online" => WirelessMode.Online,
+                            _ => throw new ArgumentException($"--wifi: unknown mode {wifi} (off, local or online)."),
+                        };
+                        break;
+                    case "--wifi-port": cl.WirelessPort = OptionalPort() ?? throw new ArgumentException("--wifi-port needs a port."); break;
+                    case "--wifi-lan": cl.WirelessLan = true; break;
+                    case "--dns": cl.Dns = Next(); break;
+                    case "--cpu":
+                        string mode = Next();
+                        cl.CpuMode = mode.ToLowerInvariant() switch
+                        {
+                            "interpreter" or "interp" => Px86.NintendoDS.EmulatorCore.Jit.CpuMode.Interpreter,
+                            "cached" => Px86.NintendoDS.EmulatorCore.Jit.CpuMode.Cached,
+                            "jit" => Px86.NintendoDS.EmulatorCore.Jit.CpuMode.Jit,
+                            _ => throw new ArgumentException($"--cpu: unknown mode {mode} (interpreter, cached or jit)."),
+                        };
+                        break;
                     case "--replay-gx": cl.ReplayGxPath = Next(); break;
                     case "--save-settings": cl.SaveSettings = true; break;
                     case "-h":
@@ -101,11 +136,13 @@ namespace Px86.NintendoDS.Emulator
                 }
             }
 
+            // Developer defaults: only used on the machine where these files exist.
             var resources = @"C:\Users\tholu\Desktop\Px86-NintendoDS\resources";
-            cl.Bios9Path = cl.Bios9Path ?? @$"{resources}\bios\bios9.bin";
-            cl.Bios7Path = cl.Bios7Path ?? @$"{resources}\bios\bios7.bin";
-            cl.FirmwarePath = cl.FirmwarePath ?? @$"{resources}\bios\firmware.bin";
-            cl.RomPath = cl.RomPath ?? $@"{resources}\roms\Pokemon - Platinum Version (USA) (Rev 1).nds";
+            static string? IfExists(string path) => File.Exists(path) ? path : null;
+            cl.Bios9Path ??= IfExists(@$"{resources}\bios\bios9.bin");
+            cl.Bios7Path ??= IfExists(@$"{resources}\bios\bios7.bin");
+            cl.FirmwarePath ??= IfExists(@$"{resources}\bios\firmware.bin");
+            cl.RomPath ??= IfExists($@"{resources}\roms\Pokemon - Platinum Version (USA) (Rev 1).nds");
 
             return cl;
         }
@@ -133,13 +170,19 @@ namespace Px86.NintendoDS.Emulator
               --gs-codec <c>        GS stream format: jpeg (default), png or raw
               --gs-quality <n>      GS stream JPEG quality 1-100 (default 85)
               --paused              Start paused (resume over PINE or with P)
+              --cpu <mode>          interpreter, cached or jit (default: jit, from settings)
+              --wifi <mode>         off, local (trade/battle with other emulator windows) or
+                                    online (local + built-in access point for WFC replacements)
+              --wifi-port <n>       UDP port for local wireless (default 7064)
+              --wifi-lan            Local wireless across the LAN, not just this PC
+              --dns <ip>            DNS server for online play (a replacement WFC service)
               --replay-gx <file>    Re-render a GX capture (F9) to --screenshot (or <file>.png)
                                     and write a polygon/command dump to <file>.txt
               --trace-io            Log unhandled I/O register accesses
               --save-settings       Remember the BIOS/firmware/scale options
 
             Controls (default): arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,
-            Enter = Start, Backspace = Select, mouse = touch screen, Tab = fast-forward,
+            Enter = Start, Backspace = Select, mouse = touch screen, B = blow into the mic, Tab = fast-forward,
             P = pause, F9 = GX capture (3D bug report), F5 = save state, F8 = load state, F6/F7 = state slot,
             F11 = fullscreen, F12 = screenshot, Esc = quit. Gamepads are supported.
             """;

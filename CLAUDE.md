@@ -39,7 +39,8 @@ Px86.NintendoDS.sln
 │   ├── Hosting/EmulatorHost.cs      # Runs the console on its own thread; thread-safe control (Invoke, pause, step…)
 │   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory access
 │   ├── Remote/                      # PINE socket (28013) + GS frame stream (28014), see docs/pine-protocol.md
-│   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, system control
+│   ├── Network/                     # Local wireless (UDP multicast), software access point + NAT router (online)
+│   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, Wifi/, system control
 │   ├── Cartridge/                   # Slot protocol, KEY1, save memory (EEPROM/FLASH/FRAM)
 │   ├── Bios/                        # HLE BIOS (SWIs), BIOS stubs, sound tables
 │   ├── Video/                       # LCD timing, VRAM banks, 2D engines, Gpu3D/
@@ -88,6 +89,8 @@ or `xvfb-run` to run the real window, and read the PNG to check rendering.
 - An ARM decode index is `(op >> 16 & 0xFF0) | (op >> 4 & 0xF)`. A Thumb index is `op >> 6`.
 - SWI numbers: ARM = bits 23–16, Thumb = bits 7–0. `SwiHandler` (HLE) returns true when it handled the call.
 - Test opcodes come from `llvm-mc -triple=armv5te -show-encoding` (or `thumbv5te`). Don't hand-encode them.
+- The JIT (`EmulatorCore/Jit/JitCompiler.cs` + `Common/Cpu/JitOps.cs`) must match the interpreter bit for bit. When you
+  change a handler's behaviour or cycles, change its inlined twin too. `TestProject/Jit/` compares the two in lockstep.
 
 ### Timing and the main loop
 

@@ -13,6 +13,8 @@ namespace Px86.NintendoDS.EmulatorCore
         SpiTransfer,
         SpuSample,
         GeometryCommand,
+        WifiTick,
+        WifiTx,
         Count,
     }
 

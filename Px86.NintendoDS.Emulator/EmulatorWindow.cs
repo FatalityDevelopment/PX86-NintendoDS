@@ -34,6 +34,10 @@ namespace Px86.NintendoDS.Emulator
         private readonly Notifications _notifications = new();
         private readonly FileBrowser _browser = new();
         private AudioOutput? _audio;
+        private readonly EmulatorCore.Hardware.Spi.MicrophoneInput _micInput = new();
+        private MicrophoneCapture? _mic;
+        private string? _micDevice;
+        private string? _micError;
 
         private readonly uint[] _sharedFrame = new uint[ScreenCapture.Width * ScreenCapture.Height];
         private readonly object _frameLock = new();
@@ -90,6 +94,8 @@ namespace Px86.NintendoDS.Emulator
             _host.LocalInput = _input.Snapshot;
             _host.FrameReady += OnFrameReady;
             _host.FrameEnded += OnFrameEnded;
+            _host.GameStarted += session => session.Emulator.Spi.Touch.Microphone = _micInput;
+            _host.Invoke(() => { if (_host.Emulator is { } nds) nds.Spi.Touch.Microphone = _micInput; });
             _host.TurboSpeed = settings.TurboPercent / 100.0;
             ApplyAudio();
         }
@@ -133,7 +139,27 @@ namespace Px86.NintendoDS.Emulator
                 old.Dispose();
             }
             _audio?.SetVolume(_settings.Volume / 100f);
+
+            // Microphone: (re)open the capture device when it is turned on or changed.
+            _micInput.Gain = _settings.MicrophoneGain / 100f;
+            if (!_settings.MicrophoneEnabled || _micDevice != _settings.MicrophoneDevice)
+            {
+                _mic?.Dispose();
+                _mic = null;
+                _micError = null;
+            }
+            if (_settings.MicrophoneEnabled && _mic == null && _micError == null)
+            {
+                _micDevice = _settings.MicrophoneDevice;
+                _mic = MicrophoneCapture.TryOpen(_micDevice, _micInput, out _micError);
+                _micError ??= _mic == null ? "no capture device" : null;
+            }
         }
+
+        private string MicrophoneStatus() =>
+            _mic != null ? $"Recording from: {Notifications.Ascii(_mic.DeviceName)}."
+            : _settings.MicrophoneEnabled ? $"No microphone ({Notifications.Ascii(_micError ?? "none found")}); the blow key still works."
+            : "PC microphone off.";
 
         private void ResizeWindow(int scale)
         {
@@ -173,6 +199,7 @@ namespace Px86.NintendoDS.Emulator
                 SaveScreenshot = SaveScreenshot,
                 CaptureGx = CaptureGx,
                 Quit = () => _window.Close(),
+                MicrophoneStatus = MicrophoneStatus,
             };
             _settingsWindow = new SettingsWindow(_ui);
             _menu = new MainMenu(_ui, _settingsWindow);
@@ -343,6 +370,8 @@ namespace Px86.NintendoDS.Emulator
             if (_inputContext != null)
                 _input.PollGamepads(_inputContext.Gamepads);
             _host.FastForward = _input.FastForward;
+            _micInput.Blowing = _input.Blowing;
+            _mic?.Pump();
 
             lock (_frameLock)
             {
@@ -439,6 +468,7 @@ namespace Px86.NintendoDS.Emulator
         public void Dispose()
         {
             _audio?.Dispose();
+            _mic?.Dispose();
             _inputContext?.Dispose();
             _window.Dispose();
         }
