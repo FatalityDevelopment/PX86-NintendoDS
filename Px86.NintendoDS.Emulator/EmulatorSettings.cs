@@ -21,7 +21,7 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Window scale (1 = 256×384).</summary>
         public int Scale { get; set; } = 2;
 
-        public bool AudioEnabled { get; set; } = true;
+        public bool AudioEnabled { get; set; } = false;
 
         /// <summary>Folder for .sav files; empty = next to the ROM.</summary>
         public string? SaveDirectory { get; set; }

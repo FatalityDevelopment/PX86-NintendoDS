@@ -36,6 +36,7 @@ namespace Px86.NintendoDS.Emulator
         public static CommandLine Parse(string[] args)
         {
             var cl = new CommandLine();
+            
             for (int i = 0; i < args.Length; i++)
             {
                 string arg = args[i];
@@ -64,6 +65,13 @@ namespace Px86.NintendoDS.Emulator
                         break;
                 }
             }
+
+            var resources = @"C:\Users\tholu\Desktop\Px86-NintendoDS\resources";
+            cl.Bios9Path = cl.Bios9Path ?? @$"{resources}\bios\bios9.bin";
+            cl.Bios7Path = cl.Bios7Path ?? @$"{resources}\bios\bios7.bin";
+            cl.FirmwarePath = cl.FirmwarePath ?? @$"{resources}\bios\firmware.bin";
+            cl.RomPath = cl.RomPath ?? $@"{resources}\roms\Pokemon - Platinum Version (USA) (Rev 1).nds";
+
             return cl;
         }
 
