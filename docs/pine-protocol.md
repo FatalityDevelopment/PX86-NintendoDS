@@ -147,6 +147,7 @@ Notes on specific opcodes:
 | 65 | LoadRom | len u16, UTF-8 path | — (starts it with the configured BIOS/firmware) |
 | 66 | GetBreakInfo | — | valid u8, cpu u8, reason u8 (0 breakpoint, 1 watchpoint), pc u32, addr u32, write u8 |
 | 67 | Shutdown | — | — (headless server exits, window closes) |
+| 6F | CaptureGx | len u16, UTF-8 path | — (records the next 3D frame to a `.gxcap` file; see the emulator guide) |
 
 ## GS stream format
 

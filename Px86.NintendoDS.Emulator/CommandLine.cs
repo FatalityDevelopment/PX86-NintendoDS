@@ -44,6 +44,7 @@ namespace Px86.NintendoDS.Emulator
         public string? GsCodec { get; private set; }
         public int? GsQuality { get; private set; }
         public bool Paused { get; private set; }
+        public string? ReplayGxPath { get; private set; }
 
         /// <summary>Headless without a fixed frame count: keep running and serve PINE/GS.</summary>
         public bool ServerMode => Headless && Frames == null && ScreenshotPath == null;
@@ -87,6 +88,7 @@ namespace Px86.NintendoDS.Emulator
                     case "--gs-codec": cl.GsCodec = Next(); break;
                     case "--gs-quality": cl.GsQuality = int.Parse(Next()); break;
                     case "--paused": cl.Paused = true; break;
+                    case "--replay-gx": cl.ReplayGxPath = Next(); break;
                     case "--save-settings": cl.SaveSettings = true; break;
                     case "-h":
                     case "--help": cl.ShowHelp = true; break;
@@ -123,12 +125,14 @@ namespace Px86.NintendoDS.Emulator
               --gs-codec <c>        GS stream format: jpeg (default), png or raw
               --gs-quality <n>      GS stream JPEG quality 1-100 (default 85)
               --paused              Start paused (resume over PINE or with P)
+              --replay-gx <file>    Re-render a GX capture (F9) to --screenshot (or <file>.png)
+                                    and write a polygon/command dump to <file>.txt
               --trace-io            Log unhandled I/O register accesses
               --save-settings       Remember the BIOS/firmware/scale options
 
             Controls (default): arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,
             Enter = Start, Backspace = Select, mouse = touch screen, Tab = fast-forward,
-            P = pause, F5 = save state, F8 = load state, F6/F7 = state slot,
+            P = pause, F9 = GX capture (3D bug report), F5 = save state, F8 = load state, F6/F7 = state slot,
             F11 = fullscreen, F12 = screenshot, Esc = quit. Gamepads are supported.
             """;
     }

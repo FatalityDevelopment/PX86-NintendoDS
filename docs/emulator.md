@@ -41,6 +41,7 @@ With a firmware dump, your nickname, language and touch-screen calibration come 
 | Previous / next state slot | F6 / F7 (slots 0–9, shown in the title bar) | — |
 | Fullscreen | F11 | — |
 | Screenshot | F12 (saved to Pictures/Px86.NintendoDS) | — |
+| GX capture (3D bug report) | F9 (saved to Pictures/Px86.NintendoDS as `.gxcap`) | — |
 | Quit | Esc | — |
 
 Save states are written next to the ROM as `game.st0` … `game.st9`. A state is the whole
@@ -67,6 +68,16 @@ game saves. An existing `.sav` file determines the type from its size, so saves 
   "KeyBindings": { "Up": "Up", "X": "A", "Z": "B", "...": "..." }
 }
 ```
+
+## Reporting 3D glitches (GX capture)
+
+If a 3D scene renders wrongly, press **F9** while it's on screen. The emulator records that frame's
+geometry commands, plus the textures and 3D settings it uses, into a `.gxcap` file in
+Pictures/Px86.NintendoDS. The file holds one frame of 3D data, not the ROM, so it can be shared with
+whoever fixes the bug.
+
+`Px86.NintendoDS.Emulator --replay-gx file.gxcap` re-renders it without the game. It writes
+`file.png` and `file.txt`, a dump of every polygon and command.
 
 ## Headless server (CodeDesigner and other tools)
 

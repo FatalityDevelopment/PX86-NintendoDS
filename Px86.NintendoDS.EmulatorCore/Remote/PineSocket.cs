@@ -617,6 +617,12 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                     _host.LoadGame(LoadOptions(path));
                     return true;
                 }
+                case PineOpcodes.CaptureGx:
+                {
+                    string path = rq.Utf8(rq.U16());
+                    return _host.CaptureGx(path, (file, error) =>
+                        Log?.Invoke(error == null ? $"[PINE] GX capture written to {file}" : $"[PINE] GX capture failed: {error.Message}"));
+                }
                 case PineOpcodes.Shutdown:
                     ShutdownRequested?.Invoke();
                     return true;

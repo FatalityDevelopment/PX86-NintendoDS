@@ -3,6 +3,7 @@ using Px86.NintendoDS.Common.Cpu;
 using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Video;
+using Px86.NintendoDS.EmulatorCore.Video.Gpu3D;
 
 namespace Px86.NintendoDS.EmulatorCore.Hosting
 {
@@ -369,6 +370,35 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
         });
 
         public bool LoadStateFile(string path) => Invoke(() => Session?.LoadStateFile(path) ?? false);
+
+        // ── GX capture ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Record the 3D commands of the next frame to <paramref name="path"/>
+        /// (see <see cref="GxCapture"/>). The file is written at the next buffer
+        /// swap; <paramref name="done"/> gets the path (or the error). False if no game runs.
+        /// </summary>
+        public bool CaptureGx(string path, Action<string, Exception?>? done = null) => Invoke(() =>
+        {
+            if (Emulator is not { } nds)
+                return false;
+            var recorder = new GxCaptureRecorder(nds);
+            recorder.Completed += bytes =>
+            {
+                recorder.Detach();
+                try
+                {
+                    File.WriteAllBytes(path, bytes);
+                    done?.Invoke(path, null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    done?.Invoke(path, ex);
+                }
+            };
+            recorder.Start();
+            return true;
+        });
 
         // ── Remote input ──────────────────────────────────────────────────────
 

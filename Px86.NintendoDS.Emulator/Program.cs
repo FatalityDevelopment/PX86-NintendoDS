@@ -34,6 +34,9 @@ namespace Px86.NintendoDS.Emulator
                 return 2;
             }
 
+            if (cl.ReplayGxPath != null)
+                return ReplayGx(cl.ReplayGxPath, cl.ScreenshotPath);
+
             if (cl.ShowHelp || (cl.RomPath == null && cl.Headless && !cl.ServerMode))
             {
                 Console.WriteLine(CommandLine.HelpText);
@@ -190,6 +193,26 @@ namespace Px86.NintendoDS.Emulator
                 return; // GameStarted is raised again on reset
             nds.Arm9Bus.UnhandledIo += (a, w, write) => Console.WriteLine($"[IO9] {(write ? "W" : "R")}{w} {a:X8}");
             nds.Arm7Bus.UnhandledIo += (a, w, write) => Console.WriteLine($"[IO7] {(write ? "W" : "R")}{w} {a:X8}");
+        }
+
+        private static int ReplayGx(string path, string? screenshot)
+        {
+            try
+            {
+                var result = EmulatorCore.Video.Gpu3D.GxCapture.Replay(File.ReadAllBytes(path));
+                screenshot ??= Path.ChangeExtension(path, ".png");
+                FileFormats.Images.PngWriter.Write(screenshot, 256, 192, result.Pixels);
+                string dump = Path.ChangeExtension(path, ".txt");
+                File.WriteAllText(dump, result.Describe());
+                Console.WriteLine($"{result.GameCode}: {result.Polygons.Count} polygons from {result.Commands.Count} command words.");
+                Console.WriteLine($"Image: {screenshot}\nDump:  {dump}");
+                return 0;
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or EndOfStreamException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Could not replay {path}: {ex.Message}");
+                return 1;
+            }
         }
 
         private static int RunHeadless(GameSession session, CommandLine cl)

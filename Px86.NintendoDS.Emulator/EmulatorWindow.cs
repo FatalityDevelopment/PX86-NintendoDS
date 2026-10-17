@@ -134,6 +134,9 @@ namespace Px86.NintendoDS.Emulator
                 case Key.F12:
                     SaveScreenshot();
                     return;
+                case Key.F9:
+                    CaptureGx();
+                    return;
                 case Key.F5:
                     RunStateAction(() => _host.SaveState(_stateSlot), $"Saved state slot {_stateSlot}");
                     return;
@@ -212,6 +215,18 @@ namespace Px86.NintendoDS.Emulator
             lock (_frameLock)
                 Px86.NintendoDS.FileFormats.Images.PngWriter.Write(path, ScreenCapture.Width, ScreenCapture.Height, _sharedFrame);
             Console.WriteLine($"Screenshot: {path}");
+        }
+
+        /// <summary>F9: record the next 3D frame for bug reports (see docs/emulator.md).</summary>
+        private void CaptureGx()
+        {
+            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Px86.NintendoDS");
+            Directory.CreateDirectory(folder);
+            string code = _host.Invoke(() => _host.Emulator?.Rom?.Header.GameCode) ?? "NDS";
+            string path = Path.Combine(folder, $"{code}-{DateTime.Now:yyyyMMdd-HHmmss}{EmulatorCore.Video.Gpu3D.GxCapture.FileExtension}");
+            if (!_host.CaptureGx(path, (file, error) =>
+                    Console.WriteLine(error == null ? $"GX capture: {file}" : $"GX capture failed: {error.Message}")))
+                Console.WriteLine("GX capture needs a running game.");
         }
 
         private void OnClosing()
