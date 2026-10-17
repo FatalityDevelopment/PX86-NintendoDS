@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Px86.NintendoDS.Common", "Px86.NintendoDS.Common\Px86.NintendoDS.Common.csproj", "{53EF5ADE-09FA-48D3-A820-D92AD50E0AFD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Px86.NintendoDS.FileFormats", "Px86.NintendoDS.FileFormats\Px86.NintendoDS.FileFormats.csproj", "{F4D18F60-B6B4-4E87-AA54-5745A37A5B35}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Px86.NintendoDS.EmulatorCore", "Px86.NintendoDS.EmulatorCore\Px86.NintendoDS.EmulatorCore.csproj", "{09465B15-39FC-4062-9EA0-1EDE60BCFFF5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Px86.NintendoDS.Emulator", "Px86.NintendoDS.Emulator\Px86.NintendoDS.Emulator.csproj", "{FD9EED4D-9F90-4DFE-82AB-BFD67FDB31D5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Px86.NintendoDS.TestProject", "Px86.NintendoDS.TestProject\Px86.NintendoDS.TestProject.csproj", "{02D75689-E76B-4BD2-A6A1-5CEC05D742E7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{53EF5ADE-09FA-48D3-A820-D92AD50E0AFD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{53EF5ADE-09FA-48D3-A820-D92AD50E0AFD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{53EF5ADE-09FA-48D3-A820-D92AD50E0AFD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{53EF5ADE-09FA-48D3-A820-D92AD50E0AFD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4D18F60-B6B4-4E87-AA54-5745A37A5B35}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4D18F60-B6B4-4E87-AA54-5745A37A5B35}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4D18F60-B6B4-4E87-AA54-5745A37A5B35}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4D18F60-B6B4-4E87-AA54-5745A37A5B35}.Release|Any CPU.Build.0 = Release|Any CPU
+		{09465B15-39FC-4062-9EA0-1EDE60BCFFF5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{09465B15-39FC-4062-9EA0-1EDE60BCFFF5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{09465B15-39FC-4062-9EA0-1EDE60BCFFF5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{09465B15-39FC-4062-9EA0-1EDE60BCFFF5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD9EED4D-9F90-4DFE-82AB-BFD67FDB31D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD9EED4D-9F90-4DFE-82AB-BFD67FDB31D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD9EED4D-9F90-4DFE-82AB-BFD67FDB31D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD9EED4D-9F90-4DFE-82AB-BFD67FDB31D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02D75689-E76B-4BD2-A6A1-5CEC05D742E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02D75689-E76B-4BD2-A6A1-5CEC05D742E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02D75689-E76B-4BD2-A6A1-5CEC05D742E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02D75689-E76B-4BD2-A6A1-5CEC05D742E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
