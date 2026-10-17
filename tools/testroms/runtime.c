@@ -9,3 +9,21 @@ void __aeabi_memcpy4(void *d, const void *s, size_t n) { memcpy(d, s, n); }
 void __aeabi_memset(void *d, size_t n, int v) { memset(d, v, n); }
 void __aeabi_memclr(void *d, size_t n) { memset(d, 0, n); }
 void __aeabi_memclr4(void *d, size_t n) { memset(d, 0, n); }
+
+/* Integer division (ARMv4T/v5TE have no divide instruction): shift-and-subtract. */
+unsigned __aeabi_uidiv(unsigned n, unsigned d)
+{
+    if (d == 0) return 0;
+    unsigned q = 0, r = 0;
+    for (int i = 31; i >= 0; i--) {
+        r = (r << 1) | ((n >> i) & 1);
+        if (r >= d) { r -= d; q |= 1u << i; }
+    }
+    return q;
+}
+
+int __aeabi_idiv(int n, int d)
+{
+    unsigned q = __aeabi_uidiv(n < 0 ? -(unsigned)n : (unsigned)n, d < 0 ? -(unsigned)d : (unsigned)d);
+    return (n < 0) != (d < 0) ? -(int)q : (int)q;
+}
