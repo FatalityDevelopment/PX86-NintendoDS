@@ -49,6 +49,10 @@ namespace Px86.NintendoDS.Emulator
         private SettingsWindow? _settingsWindow;
         private CheatsWindow? _cheatsWindow;
         private CheatSearchWindow? _searchWindow;
+        private DebuggerWindow? _debugger;
+        private MemoryWindow? _memory;
+        private IoWindow? _io;
+        private VideoWindow? _video;
         private ScreenLayout _layout;
         private bool _touching;
         private readonly Stopwatch _titleTimer = Stopwatch.StartNew();
@@ -178,6 +182,16 @@ namespace Px86.NintendoDS.Emulator
             _menu.ToolItems.Add(("Cheat search...", null, _searchWindow.Open));
             _host.CheatFailed += (name, error) => _notifications.Add($"Cheat '{name}' switched off: {error}");
 
+            _debugger = new DebuggerWindow(_ui);
+            _memory = new MemoryWindow(_ui);
+            _io = new IoWindow(_ui);
+            _video = new VideoWindow(_ui, _gl);
+            _menu.ToolItems.Add(("Debugger...", "Ctrl+D", _debugger.Open));
+            _menu.ToolItems.Add(("Memory...", "Ctrl+M", _memory.Open));
+            _menu.ToolItems.Add(("I/O registers...", null, _io.Open));
+            _menu.ToolItems.Add(("Video viewers...", null, _video.Open));
+            _host.BreakHit += OnBreakHit;
+
             foreach (var keyboard in _inputContext.Keyboards)
             {
                 keyboard.KeyDown += OnKeyDown;
@@ -212,6 +226,8 @@ namespace Px86.NintendoDS.Emulator
                     case Key.R: _host.Reset(); _notifications.Add("Reset"); return;
                     case Key.Comma: _settingsWindow.Open(); return;
                     case Key.C when !ImGui.GetIO().WantTextInput: _cheatsWindow!.Open(); return;
+                    case Key.D: _debugger!.Open(); return;
+                    case Key.M: _memory!.Open(); return;
                 }
             }
 
@@ -297,6 +313,15 @@ namespace Px86.NintendoDS.Emulator
             _input.SetTouch(null);
         }
 
+        /// <summary>Emulation thread: a breakpoint or watchpoint paused the game.</summary>
+        private void OnBreakHit(EmulatorCore.Debugging.BreakInfo info)
+        {
+            _debugger?.OnBreak(info);
+            _notifications.Add(info.Reason == EmulatorCore.Debugging.BreakReason.Watchpoint
+                ? $"{info.Cpu}: {(info.IsWrite ? "write to" : "read of")} {info.Address:X8} at {info.Pc:X8}"
+                : $"{info.Cpu}: breakpoint at {info.Pc:X8}");
+        }
+
         private void OnFileDrop(string[] paths)
         {
             var rom = paths.FirstOrDefault(p => p.EndsWith(".nds", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".srl", StringComparison.OrdinalIgnoreCase));
@@ -336,6 +361,10 @@ namespace Px86.NintendoDS.Emulator
             _settingsWindow!.Draw();
             _cheatsWindow!.Draw();
             _searchWindow!.Draw();
+            _debugger!.Draw();
+            _memory!.Draw();
+            _io!.Draw();
+            _video!.Draw();
             _browser.Draw();
             _notifications.Draw();
 
@@ -393,12 +422,14 @@ namespace Px86.NintendoDS.Emulator
         {
             _host.FrameReady -= OnFrameReady;
             _host.FrameEnded -= OnFrameEnded;
+            _host.BreakHit -= OnBreakHit;
             _host.LocalInput = null;
             _host.Stop();
             _host.Invoke(() => _host.Session?.FlushSave());
             _launcher.TrySaveSettings();
 
             // GL objects must go while the context still exists.
+            _video?.Dispose();
             _imgui?.Dispose();
             _imgui = null;
             _renderer?.Dispose();

@@ -22,7 +22,7 @@ The menu bar sits at the top of the window. Esc hides it, for example in fullscr
 | File | Open ROM, Recent, Close ROM, Save/Load state (slots 0–9 with times, or any file), Screenshot, GX capture, Exit |
 | Emulation | Pause/Resume, Frame advance, Reset, Speed (normal, turbo, slow motion, unlimited) |
 | Config | Settings…, screen layout, swap screens, smooth filtering, fullscreen |
-| Tools | Cheats (Ctrl+C), Cheat search, PINE socket and GS frame stream on/off (for CodeDesigner) |
+| Tools | Cheats (Ctrl+C), Cheat search, Debugger (Ctrl+D), Memory (Ctrl+M), I/O registers, Video viewers, PINE socket and GS frame stream on/off (for CodeDesigner) |
 | Help | Controls, About |
 
 **Config → Settings** (Ctrl+,) has these tabs. Settings are saved when the window closes.
@@ -122,6 +122,27 @@ A code that doesn't parse is switched off, with a message saying why.
    unchanged, increased, decreased, or changed by a given amount since the last scan.
 3. Repeat until only a few addresses are left.
 4. **Make cheat** turns one of them into a raw cheat that holds the value.
+
+## Debugging
+
+These are the same tools the PINE socket exposes, so CodeDesigner and the built-in windows can be used together.
+
+- **Debugger** (Ctrl+D). Choose the ARM9 or ARM7.
+  - Run control: Continue/Pause, Step, Step over (runs a whole BL/BLX/SWI), Step out (runs to LR), Frame advance.
+  - Registers: click one while paused to edit it.
+  - Disassembly: follows the PC in ARM or Thumb, or you can force a mode. Click a line to toggle a breakpoint;
+    right-click for *Run to here*.
+  - Breakpoint and watchpoint lists. Watchpoints can break on reads, writes or both over an address range.
+  - When a breakpoint or watchpoint hits, the game pauses and the debugger opens at that instruction.
+- **Memory** (Ctrl+M): a hex editor over either CPU's address space, with quick jumps to each region. Click a byte
+  to type a new value. *Break on write/read* makes a watchpoint from the selection.
+- **I/O registers**: the main display, VRAM, interrupt, DMA, timer, IPC, cartridge, 3D and sound registers of
+  both CPUs, live, with key fields decoded.
+- **Video viewers**:
+  - all four palettes;
+  - a tile viewer for each engine's BG/OBJ VRAM, at 4 or 8 bpp with a chosen palette;
+  - the OAM sprite table;
+  - the last frame's 3D polygon list, with each polygon's vertices.
 
 ## Reporting 3D glitches (GX capture)
 
