@@ -72,17 +72,24 @@ namespace Px86.NintendoDS.EmulatorCore
             Lcd = new LcdController(Scheduler, Irq9, Irq7, Dma9, Dma7);
             EngineA = new Gpu2DEngine(true, Vram, Palette, Oam);
             EngineB = new Gpu2DEngine(false, Vram, Palette, Oam);
-            Gpu3D = new Gpu3DEngine();
+            Gpu3D = new Gpu3DEngine(Vram, Irq9, Dma9);
+            EngineA.ThreeDLineProvider = Gpu3D.GetLine;
+            EngineA.Alpha3DProvider = Gpu3D.GetAlpha;
             Sound = new SoundUnit();
 
             Hle9 = new HleBios(this, isArm9: true);
             Hle7 = new HleBios(this, isArm9: false);
 
             Control.ExMemChanged += () => Cartridge.Owner = Control.NdsSlotOwner;
-            Dma9.Started += timing => { if (timing == DmaTiming.Cartridge) Cartridge.OnDmaStarted(0); };
+            Dma9.Started += timing =>
+            {
+                if (timing == DmaTiming.Cartridge) Cartridge.OnDmaStarted(0);
+                else if (timing == DmaTiming.GeometryFifo) Gpu3D.OnDmaStarted();
+            };
             Dma7.Started += timing => { if (timing == DmaTiming.Cartridge) Cartridge.OnDmaStarted(1); };
             Lcd.ScanlineReady += RenderScanline;
             Lcd.VBlankStarted += OnVBlank;
+            Lcd.LineStarted += _ => Gpu3D.CheckFifoIrq();
 
             Reset();
         }
@@ -321,6 +328,8 @@ namespace Px86.NintendoDS.EmulatorCore
 
         private void OnVBlank()
         {
+            // POWCNT1 bits 2–3: 3D rendering and geometry engines powered.
+            Gpu3D.OnVBlank(renderEnabled: (Control.PowerControl9 & 0x000C) == 0x000C);
             EngineA.OnVBlank();
             EngineB.OnVBlank();
             FrameCount++;

@@ -81,3 +81,21 @@ static inline void swi_lz77(const void *src, void *dst)
     register void *r1 __asm__("r1") = dst;
     __asm__ volatile("swi 0x110000" : "+r"(r0), "+r"(r1) :: "r2", "r3", "r12", "lr", "memory");
 }
+
+/* Minimal ARM9 IRQ setup: VBlank IRQ that acknowledges itself and sets the
+ * BIOS check bits, so swi_vblank_wait() works. */
+static void nds_default_irq9(void)
+{
+    u32 flags = IF & IE;
+    IF = flags;
+    IRQ_CHECK9 |= flags;
+}
+
+static inline void irq_init_vblank9(void)
+{
+    IRQ_HANDLER9 = nds_default_irq9;
+    DISPSTAT = 1 << 3;
+    IE = IRQ_VBLANK;
+    IME = 1;
+    __asm__ volatile("mrs r0, cpsr\n bic r0, r0, #0x80\n msr cpsr_c, r0" ::: "r0");
+}

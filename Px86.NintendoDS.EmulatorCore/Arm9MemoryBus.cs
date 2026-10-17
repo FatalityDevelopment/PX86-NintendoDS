@@ -480,10 +480,7 @@ namespace Px86.NintendoDS.EmulatorCore
             }
             if (Gpu3DEngine.Contains(offset))
             {
-                if (mask == 0xFFFFFFFFu)
-                    _nds.Gpu3D.Write32(offset, value);
-                else
-                    _nds.Gpu3D.Write32(offset, (_nds.Gpu3D.Read32(offset) & ~mask) | (value & mask));
+                _nds.Gpu3D.Write32(offset, value, mask);
                 return true;
             }
             return false;

@@ -168,6 +168,14 @@ namespace Px86.NintendoDS.EmulatorCore.Video
             uint dispcnt = DisplayControl;
             int mode = (int)(dispcnt >> 16) & (IsEngineA ? 3 : 1);
             Span<ushort> rgb = stackalloc ushort[256];
+            Span<ushort> graphics = stackalloc ushort[256];
+
+            if (IsEngineA && line == 0)
+                _capturing = (Reg32(REG_DISPCAPCNT) & 0x80000000u) != 0;
+
+            // The layered BG/OBJ output is needed for display mode 1 and as capture source A.
+            if (mode == 1 || _capturing)
+                RenderNormal(line, graphics);
 
             switch (mode)
             {
@@ -175,7 +183,7 @@ namespace Px86.NintendoDS.EmulatorCore.Video
                     rgb.Fill(0x7FFF);
                     break;
                 case 1:
-                    RenderNormal(line, rgb);
+                    graphics.CopyTo(rgb);
                     break;
                 case 2:
                 {
@@ -190,6 +198,9 @@ namespace Px86.NintendoDS.EmulatorCore.Video
                         rgb[x] = MainMemoryFifo?.Invoke() ?? 0;
                     break;
             }
+
+            if (_capturing)
+                Capture(line, graphics, mode);
 
             ApplyMasterBrightness(rgb, output);
             AdvanceAffine();
@@ -241,6 +252,84 @@ namespace Px86.NintendoDS.EmulatorCore.Video
             g = (g << 2) | (g >> 4);
             b = (b << 2) | (b >> 4);
             return 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
+
+        // ── Display capture (engine A) ────────────────────────────────────────
+
+        private bool _capturing;
+
+        /// <summary>
+        /// DISPCAPCNT (04000064h): capture source A (graphics or 3D), source B
+        /// (VRAM or main-memory FIFO), or a blend of both, into an LCDC bank.
+        /// Starts at line 0 when bit 31 is set; bit 31 clears at line 192.
+        /// Reference: GBATEK "DS Video Capture and Main Memory Display Mode".
+        /// </summary>
+        private void Capture(int line, ReadOnlySpan<ushort> graphics, int displayMode)
+        {
+            uint control = Reg32(REG_DISPCAPCNT);
+            (int width, int height) = ((control >> 20) & 3) switch
+            {
+                0 => (128, 128),
+                1 => (256, 64),
+                2 => (256, 128),
+                _ => (256, 192),
+            };
+
+            if (line < height)
+            {
+                int eva = Math.Min((int)(control & 0x1F), 16);
+                int evb = Math.Min((int)((control >> 8) & 0x1F), 16);
+                int writeBank = (int)(control >> 16) & 3;
+                uint writeOffset = ((control >> 18) & 3) * 0x8000;
+                uint readOffset = displayMode == 2 ? 0 : ((control >> 26) & 3) * 0x8000;
+                int readBank = (int)(DisplayControl >> 18) & 3;
+                bool sourceA3D = (control & (1u << 24)) != 0;
+                bool sourceBFifo = (control & (1u << 25)) != 0;
+                int source = (int)(control >> 29) & 3;
+                ushort[]? line3D = sourceA3D ? ThreeDLineProvider?.Invoke(line) : null;
+
+                for (int x = 0; x < width; x++)
+                {
+                    ushort a;
+                    if (sourceA3D)
+                        a = line3D?[x] ?? 0;
+                    else
+                        a = (ushort)(graphics[x] | 0x8000);
+
+                    ushort b = 0;
+                    if (source != 0)
+                    {
+                        if (sourceBFifo)
+                            b = (ushort)((MainMemoryFifo?.Invoke() ?? 0) | 0x8000);
+                        else
+                            b = _vram.Lcdc.Read16((uint)(readBank * 0x20000) + ((readOffset + (uint)((line * width + x) * 2)) & 0x1FFFF));
+                    }
+
+                    ushort result = source switch
+                    {
+                        0 => a,
+                        1 => b,
+                        _ => BlendCapture(a, b, eva, evb),
+                    };
+                    _vram.Lcdc.Write16((uint)(writeBank * 0x20000) + ((writeOffset + (uint)((line * width + x) * 2)) & 0x1FFFF), result);
+                }
+            }
+
+            if (line == 191)
+            {
+                _capturing = false;
+                _regs[(REG_DISPCAPCNT >> 1) + 1] &= 0x7FFF;
+            }
+        }
+
+        private static ushort BlendCapture(ushort a, ushort b, int eva, int evb)
+        {
+            int alphaA = (a >> 15) & 1, alphaB = (b >> 15) & 1;
+            int r = Math.Min(31, ((a & 0x1F) * alphaA * eva + (b & 0x1F) * alphaB * evb) >> 4);
+            int g = Math.Min(31, (((a >> 5) & 0x1F) * alphaA * eva + ((b >> 5) & 0x1F) * alphaB * evb) >> 4);
+            int bl = Math.Min(31, (((a >> 10) & 0x1F) * alphaA * eva + ((b >> 10) & 0x1F) * alphaB * evb) >> 4);
+            bool alpha = (alphaA != 0 && eva > 0) || (alphaB != 0 && evb > 0);
+            return (ushort)(r | (g << 5) | (bl << 10) | (alpha ? 0x8000 : 0));
         }
 
         private ushort PaletteColor(int index) => MemoryAccess.Read16(_palette, _paletteBase + index * 2);
