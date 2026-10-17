@@ -100,7 +100,8 @@ namespace Px86.NintendoDS.Common.Cpu
 
         public bool IsArmV5 => Architecture == ArmArchitecture.ARMv5TE;
 
-        public IArmMemoryBus Bus { get; }
+        /// <summary>The bus this core uses. A debugger may wrap it (watchpoints) and restore it later.</summary>
+        public IArmMemoryBus Bus { get; set; }
 
         /// <summary>CP15 (ARM9 only). Null means MCR/MRC p15 is undefined.</summary>
         public ICoprocessor? Cp15 { get; set; }

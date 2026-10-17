@@ -26,6 +26,23 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Folder for .sav files; empty = next to the ROM.</summary>
         public string? SaveDirectory { get; set; }
 
+        // ── Remote control (CodeDesigner, debuggers) ──────────────────────────
+
+        /// <summary>Open the PINE socket in the window too (headless server mode always opens it).</summary>
+        public bool PineEnabled { get; set; }
+
+        public int PinePort { get; set; } = 28013;
+
+        /// <summary>Open the GS frame-stream socket in the window too.</summary>
+        public bool GsEnabled { get; set; }
+
+        public int GsPort { get; set; } = 28014;
+
+        /// <summary>GS stream picture format: jpeg, png or raw.</summary>
+        public string GsCodec { get; set; } = "jpeg";
+
+        public int GsQuality { get; set; } = 85;
+
         /// <summary>Host key names (Silk.NET Key enum) mapped to DS buttons.</summary>
         public Dictionary<string, string> KeyBindings { get; set; } = new()
         {

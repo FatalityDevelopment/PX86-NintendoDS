@@ -68,6 +68,19 @@ game saves. An existing `.sav` file determines the type from its size, so saves 
 }
 ```
 
+## Headless server (CodeDesigner and other tools)
+
+`Px86.NintendoDS.Emulator game.nds --headless` runs without a window and opens two local sockets:
+- **PINE** on 127.0.0.1:28013: memory, registers, breakpoints, stepping, save states, input;
+- **GS stream** on 127.0.0.1:28014: live JPEG frames.
+
+Useful options:
+- `--paused` starts paused.
+- Leaving out the ROM starts an empty server that waits for a client to load one.
+- `--pine` / `--gs` open the sockets in the normal window too.
+
+Everything is described in [pine-protocol.md](pine-protocol.md).
+
 ## Command line
 
 Run with `--help` to see every option. For debugging, `--headless --frames N --screenshot out.png` runs without a window

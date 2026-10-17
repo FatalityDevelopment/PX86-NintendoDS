@@ -1,12 +1,13 @@
 using Silk.NET.Input;
 using Px86.NintendoDS.EmulatorCore;
 using Px86.NintendoDS.EmulatorCore.Hardware;
+using Px86.NintendoDS.EmulatorCore.Hosting;
 
 namespace Px86.NintendoDS.Emulator
 {
     /// <summary>
     /// Turns host input into DS input. Written by the window thread, read by
-    /// the emulation thread once per frame (<see cref="Apply"/>).
+    /// the emulation thread before every chunk (<see cref="Snapshot"/>).
     ///
     /// Keyboard bindings come from <see cref="EmulatorSettings.KeyBindings"/>.
     /// Gamepads use the standard layout: D-pad/left stick = D-pad, south/east/
@@ -99,8 +100,8 @@ namespace Px86.NintendoDS.Emulator
             _fastForwardPad = fast;
         }
 
-        /// <summary>Emulation thread: push the current state into the console.</summary>
-        public void Apply(NdsEmulator nds)
+        /// <summary>The current input, for <see cref="EmulatorHost.LocalInput"/> (called by the emulation thread).</summary>
+        public InputState Snapshot()
         {
             NdsButton buttons;
             (int X, int Y)? touch;
@@ -115,18 +116,7 @@ namespace Px86.NintendoDS.Emulator
                 buttons &= ~(NdsButton.Left | NdsButton.Right);
             if ((buttons & (NdsButton.Up | NdsButton.Down)) == (NdsButton.Up | NdsButton.Down))
                 buttons &= ~(NdsButton.Up | NdsButton.Down);
-
-            nds.Keypad.SetButtons(buttons);
-            if (touch is { } p)
-            {
-                nds.Spi.Touch.SetTouch(p.X, p.Y);
-                nds.Keypad.SetPen(true);
-            }
-            else
-            {
-                nds.Spi.Touch.ReleaseTouch();
-                nds.Keypad.SetPen(false);
-            }
+            return new InputState(buttons, touch);
         }
     }
 }

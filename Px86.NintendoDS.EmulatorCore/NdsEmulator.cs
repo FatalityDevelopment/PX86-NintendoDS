@@ -4,6 +4,7 @@ using Px86.NintendoDS.Common.Cpu.Coprocessors;
 using Px86.NintendoDS.EmulatorCore.Audio;
 using Px86.NintendoDS.EmulatorCore.Bios;
 using Px86.NintendoDS.EmulatorCore.Cartridge;
+using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
 using Px86.NintendoDS.EmulatorCore.Video;
@@ -12,6 +13,14 @@ using Px86.NintendoDS.FileFormats.Rom;
 
 namespace Px86.NintendoDS.EmulatorCore
 {
+    /// <summary>Why <see cref="NdsEmulator.Run"/> returned.</summary>
+    public enum RunResult
+    {
+        FrameCompleted,
+        BudgetUsed,
+        Break,
+    }
+
     /// <summary>
     /// The whole Nintendo DS: both CPUs, their buses, memory and every
     /// peripheral, plus the main loop.
@@ -327,29 +336,120 @@ namespace Px86.NintendoDS.EmulatorCore
         private long _arm7Time;
         private bool _frameDone;
 
-        /// <summary>Run until the next VBlank (one 59.83 Hz frame).</summary>
-        public void RunFrame()
-        {
-            _frameDone = false;
-            long limit = Scheduler.Now + LcdController.Arm9CyclesPerFrame * 2;
-            while (!_frameDone && Scheduler.Now < limit)
-                RunSlice();
-        }
+        /// <summary>Run until the next VBlank (one 59.83 Hz frame), or until the debugger stops a core.</summary>
+        public void RunFrame() => Run(LcdController.Arm9CyclesPerFrame * 2);
 
         /// <summary>Run approximately <paramref name="arm9Cycles"/> ARM9 cycles (tests, debugging).</summary>
         public void RunCycles(long arm9Cycles)
         {
             long end = Scheduler.Now + arm9Cycles;
             while (Scheduler.Now < end)
-                RunSlice(end);
+            {
+                if (!RunSlice(end))
+                    return;
+            }
         }
 
-        private void RunSlice(long hardLimit = long.MaxValue)
+        /// <summary>
+        /// Run until VBlank starts, <paramref name="arm9Cycles"/> have passed or
+        /// the <see cref="Debugger"/> stops a core, whichever comes first. A
+        /// stopped run leaves the machine between two instructions of the
+        /// stopped core; calling this again continues exactly from there.
+        /// </summary>
+        public RunResult Run(long arm9Cycles)
+        {
+            _frameDone = false;
+            long end = Scheduler.Now + System.Math.Max(arm9Cycles, 1);
+            while (!_frameDone && Scheduler.Now < end)
+            {
+                if (!RunSlice())
+                    return RunResult.Break;
+            }
+            return _frameDone ? RunResult.FrameCompleted : RunResult.BudgetUsed;
+        }
+
+        // ── Debugger ──────────────────────────────────────────────────────────
+
+        private DebugMonitor? _debugger;
+
+        /// <summary>Breakpoints/watchpoints. Null (the default) means no checks at all.</summary>
+        public DebugMonitor? Debugger
+        {
+            get => _debugger;
+            set
+            {
+                if (_debugger != null)
+                    _debugger.WatchesChanged -= InstallWatchBuses;
+                _debugger = value;
+                if (_debugger != null)
+                    _debugger.WatchesChanged += InstallWatchBuses;
+                InstallWatchBuses();
+            }
+        }
+
+        private void InstallWatchBuses()
+        {
+            var d = _debugger;
+            Arm9.Bus = d != null && d.HasWatches(DebugCpu.Arm9) ? new WatchingMemoryBus(Arm9Bus, d, DebugCpu.Arm9, Arm9) : Arm9Bus;
+            Arm7.Bus = d != null && d.HasWatches(DebugCpu.Arm7) ? new WatchingMemoryBus(Arm7Bus, d, DebugCpu.Arm7, Arm7) : Arm7Bus;
+        }
+
+        public ArmCpu Cpu(DebugCpu cpu) => cpu == DebugCpu.Arm9 ? Arm9 : Arm7;
+
+        /// <summary>
+        /// Execute exactly one instruction on <paramref name="cpu"/> (or take
+        /// its pending IRQ), then let the other core and the hardware catch up
+        /// to the same time. A halted core is first run until it wakes. Returns
+        /// false if the other core hit a breakpoint while catching up.
+        /// </summary>
+        public bool StepInstruction(DebugCpu cpu)
+        {
+            bool arm9 = cpu == DebugCpu.Arm9;
+            var core = arm9 ? Arm9 : Arm7;
+            var irq = arm9 ? Irq9 : Irq7;
+            var dma = arm9 ? Dma9 : Dma7;
+            int clock = arm9 ? 1 : 2;
+
+            // Bounded so a core that never wakes (IRQs off) can't hang the debugger.
+            for (int guard = 0; guard < 100_000; guard++)
+            {
+                WakeIfPending(core, irq);
+                bool halted = core.Halted && !(core.IrqLine && (core.Cpsr & ArmCpu.FLAG_I) == 0);
+                ref long time = ref arm9 ? ref _arm9Time : ref _arm7Time;
+                if (halted)
+                {
+                    time = System.Math.Max(time, Scheduler.NextEventTime);
+                }
+                else
+                {
+                    Scheduler.CurrentTime = time;
+                    time += core.Step() * clock;
+                    if (dma.PendingCycles != 0)
+                    {
+                        time += dma.PendingCycles * clock;
+                        dma.PendingCycles = 0;
+                    }
+                }
+
+                long until = time;
+                while (Scheduler.Now < until)
+                {
+                    if (!RunSlice(until))
+                        return false;
+                }
+                if (!halted)
+                    return true;
+            }
+            return true;
+        }
+
+        private bool RunSlice(long hardLimit = long.MaxValue)
         {
             long target = System.Math.Min(Scheduler.NextEventTime, Scheduler.Now + MaxSliceCycles);
             target = System.Math.Min(target, hardLimit);
             if (target <= Scheduler.Now)
                 target = Scheduler.Now + 1;
+            var debug = _debugger;
 
             // ARM9
             WakeIfPending(Arm9, Irq9);
@@ -360,6 +460,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm9Time = target;
                     break;
                 }
+                if (debug != null && debug.CheckBreakpoint(0, Arm9.Pc))
+                    return false;
                 Scheduler.CurrentTime = _arm9Time;
                 _arm9Time += Arm9.Step();
                 if (Dma9.PendingCycles != 0)
@@ -367,6 +469,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm9Time += Dma9.PendingCycles;
                     Dma9.PendingCycles = 0;
                 }
+                if (debug?.PendingBreak != null)
+                    return false;
             }
 
             // ARM7 (one ARM7 cycle = two ARM9 cycles)
@@ -378,6 +482,8 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm7Time = target;
                     break;
                 }
+                if (debug != null && debug.CheckBreakpoint(1, Arm7.Pc))
+                    return false;
                 Scheduler.CurrentTime = _arm7Time;
                 _arm7Time += Arm7.Step() * 2;
                 if (Dma7.PendingCycles != 0)
@@ -385,9 +491,12 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm7Time += Dma7.PendingCycles * 2;
                     Dma7.PendingCycles = 0;
                 }
+                if (debug?.PendingBreak != null)
+                    return false;
             }
 
             Scheduler.AdvanceTo(target);
+            return true;
         }
 
         /// <summary>HALT ends as soon as (IE &amp; IF) != 0, even if the IRQ was already pending when the CPU halted.</summary>

@@ -134,19 +134,23 @@ namespace Px86.NintendoDS.EmulatorCore
         /// memory, so loading it later also rolls that back; the .sav file is
         /// only rewritten when the game saves again.
         /// </summary>
-        public void SaveState(int slot)
+        public void SaveState(int slot) => SaveStateFile(StatePath(slot));
+
+        /// <summary>Load a slot. Returns false when the slot is empty; throws <see cref="InvalidDataException"/> for a bad file.</summary>
+        public bool LoadState(int slot) => LoadStateFile(StatePath(slot));
+
+        /// <summary>Save the whole machine to any file (written to a temporary file first, then moved into place).</summary>
+        public void SaveStateFile(string path)
         {
-            string path = StatePath(slot);
             string temp = path + ".tmp";
             using (var file = File.Create(temp))
                 Emulator.SaveState(file);
             File.Move(temp, path, overwrite: true);
         }
 
-        /// <summary>Load a slot. Returns false when the slot is empty; throws <see cref="InvalidDataException"/> for a bad file.</summary>
-        public bool LoadState(int slot)
+        /// <summary>Load a state file. Returns false when it doesn't exist; a bad file throws and leaves the machine as it was.</summary>
+        public bool LoadStateFile(string path)
         {
-            string path = StatePath(slot);
             if (!File.Exists(path))
                 return false;
             // Read it whole first, so a truncated file fails before the machine is touched.

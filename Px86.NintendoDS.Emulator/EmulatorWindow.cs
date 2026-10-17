@@ -5,6 +5,7 @@ using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using Silk.NET.Windowing.Sdl;
 using Px86.NintendoDS.EmulatorCore;
+using Px86.NintendoDS.EmulatorCore.Hosting;
 using Px86.NintendoDS.EmulatorCore.Video;
 
 namespace Px86.NintendoDS.Emulator
@@ -13,19 +14,14 @@ namespace Px86.NintendoDS.Emulator
     /// The desktop window: an SDL window with an OpenGL context showing both
     /// screens stacked vertically, keyboard/gamepad input and mouse touch.
     ///
-    /// Threads
-    ///   Emulation thread  runs <see cref="NdsEmulator.RunFrame"/> paced to
-    ///                     59.8261 Hz (unpaced while fast-forwarding), applies
-    ///                     the latest input at the start of each frame and
-    ///                     publishes finished frames into a shared buffer.
-    ///   Window thread     Silk.NET's loop: polls input, uploads the newest
-    ///                     frame to a texture and draws it letterboxed.
+    /// The console runs on the <see cref="EmulatorHost"/>'s thread. The window
+    /// thread (Silk.NET's loop) polls input, uploads the newest frame from
+    /// <see cref="EmulatorHost.FrameReady"/> to a texture and draws it
+    /// letterboxed. Audio is fed from <see cref="EmulatorHost.FrameEnded"/>.
     /// </summary>
     public sealed class EmulatorWindow : IDisposable
     {
-        public const double FrameRate = 59.8261;
-
-        private readonly GameSession _session;
+        private readonly EmulatorHost _host;
         private readonly EmulatorSettings _settings;
         private readonly IWindow _window;
         private readonly InputMapper _input;
@@ -34,24 +30,16 @@ namespace Px86.NintendoDS.Emulator
         private readonly uint[] _sharedFrame = new uint[ScreenCapture.Width * ScreenCapture.Height];
         private readonly object _frameLock = new();
         private bool _frameReady;
-
-        private Thread? _emulationThread;
-        private volatile bool _running;
-        private volatile bool _paused;
-
-        // Save-state requests are queued here and run by the emulation thread between frames.
-        private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _emulatorRequests = new();
         private int _stateSlot;
+        private volatile bool _closeRequested;
 
         private ScreenRenderer? _renderer;
         private IInputContext? _inputContext;
-        private long _framesShown;
         private readonly Stopwatch _titleTimer = Stopwatch.StartNew();
-        private long _framesAtLastTitle;
 
-        public EmulatorWindow(GameSession session, EmulatorSettings settings)
+        public EmulatorWindow(EmulatorHost host, EmulatorSettings settings)
         {
-            _session = session;
+            _host = host;
             _settings = settings;
             _input = new InputMapper(settings);
 
@@ -62,7 +50,7 @@ namespace Px86.NintendoDS.Emulator
             var options = WindowOptions.Default with
             {
                 Size = new Vector2D<int>(ScreenCapture.Width * settings.Scale, ScreenCapture.Height * settings.Scale),
-                Title = WindowTitle(0),
+                Title = WindowTitle(),
                 VSync = true,
                 API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3)),
             };
@@ -73,20 +61,39 @@ namespace Px86.NintendoDS.Emulator
             _window.Closing += OnClosing;
 
             if (settings.AudioEnabled)
-                _audio = AudioOutput.TryCreate(session.Emulator);
+                _audio = AudioOutput.TryCreate();
+
+            _host.LocalInput = _input.Snapshot;
+            _host.FrameReady += OnFrameReady;
+            if (_audio != null)
+                _host.FrameEnded += _audio.OnFrame;
         }
 
         public void Run() => _window.Run();
 
-        private string WindowTitle(double fps)
+        /// <summary>Close the window from any thread (PINE Shutdown).</summary>
+        public void RequestClose() => _closeRequested = true;
+
+        private string WindowTitle()
         {
-            var header = _session.Rom.Header;
-            string title = $"Px86.NintendoDS — {header.Title} [{header.GameCode}]";
-            if (fps > 0) title += $" — {fps:F0} fps";
+            string title = "Px86.NintendoDS";
+            if (_host.Invoke(() => _host.Emulator?.Rom?.Header) is { } header)
+                title += $" — {header.Title} [{header.GameCode}]";
+            if (_host.Fps > 0) title += $" — {_host.Fps:F0} fps";
             title += $" — slot {_stateSlot}";
-            if (_paused) title += " — paused";
-            if (_input.FastForward) title += " — fast-forward";
+            if (_host.IsPaused) title += " — paused";
+            if (_host.FastForward) title += " — fast-forward";
             return title;
+        }
+
+        /// <summary>Emulation thread: keep the newest frame for the next redraw.</summary>
+        private void OnFrameReady(uint[] frame, long frameNumber)
+        {
+            lock (_frameLock)
+            {
+                frame.CopyTo(_sharedFrame, 0);
+                _frameReady = true;
+            }
         }
 
         // ── Window thread ─────────────────────────────────────────────────────
@@ -109,10 +116,6 @@ namespace Px86.NintendoDS.Emulator
                 mouse.MouseUp += (m, button) => { if (button == MouseButton.Left) _input.SetTouch(null); };
                 mouse.MouseMove += (m, position) => { if (m.IsButtonPressed(MouseButton.Left)) UpdateTouch(position, true); };
             }
-
-            _running = true;
-            _emulationThread = new Thread(EmulationLoop) { Name = "Px86 emulation", IsBackground = true };
-            _emulationThread.Start();
         }
 
         private void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
@@ -123,7 +126,7 @@ namespace Px86.NintendoDS.Emulator
                     _window.Close();
                     return;
                 case Key.P:
-                    _paused = !_paused;
+                    _host.TogglePause();
                     return;
                 case Key.F11:
                     _window.WindowState = _window.WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
@@ -132,10 +135,10 @@ namespace Px86.NintendoDS.Emulator
                     SaveScreenshot();
                     return;
                 case Key.F5:
-                    RequestSaveState(_stateSlot);
+                    RunStateAction(() => _host.SaveState(_stateSlot), $"Saved state slot {_stateSlot}");
                     return;
                 case Key.F8:
-                    RequestLoadState(_stateSlot);
+                    RunStateAction(() => _host.LoadState(_stateSlot), $"Loaded state slot {_stateSlot}", $"State slot {_stateSlot} is empty");
                     return;
                 case Key.F6:
                 case Key.F7:
@@ -144,6 +147,18 @@ namespace Px86.NintendoDS.Emulator
                     return;
             }
             _input.KeyDown(key);
+        }
+
+        private static void RunStateAction(Func<bool> action, string done, string? notDone = null)
+        {
+            try
+            {
+                Console.WriteLine(action() ? done : notDone ?? "No game running");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Save state failed: {ex.Message}");
+            }
         }
 
         private void UpdateTouch(System.Numerics.Vector2 position, bool down)
@@ -162,8 +177,14 @@ namespace Px86.NintendoDS.Emulator
 
         private void OnRender(double delta)
         {
+            if (_closeRequested)
+            {
+                _window.Close();
+                return;
+            }
             if (_inputContext != null)
                 _input.PollGamepads(_inputContext.Gamepads);
+            _host.FastForward = _input.FastForward;
 
             lock (_frameLock)
             {
@@ -171,17 +192,14 @@ namespace Px86.NintendoDS.Emulator
                 {
                     _renderer!.Upload(_sharedFrame);
                     _frameReady = false;
-                    _framesShown++;
                 }
             }
             _renderer!.Draw();
 
             if (_titleTimer.Elapsed.TotalSeconds >= 1)
             {
-                double fps = (_framesShown - _framesAtLastTitle) / _titleTimer.Elapsed.TotalSeconds;
-                _framesAtLastTitle = _framesShown;
                 _titleTimer.Restart();
-                _window.Title = WindowTitle(fps);
+                _window.Title = WindowTitle();
             }
         }
 
@@ -189,107 +207,29 @@ namespace Px86.NintendoDS.Emulator
         {
             string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Px86.NintendoDS");
             Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, $"{_session.Rom.Header.GameCode}-{DateTime.Now:yyyyMMdd-HHmmss}.png");
+            string code = _host.Invoke(() => _host.Emulator?.Rom?.Header.GameCode) ?? "NDS";
+            string path = Path.Combine(folder, $"{code}-{DateTime.Now:yyyyMMdd-HHmmss}.png");
             lock (_frameLock)
                 Px86.NintendoDS.FileFormats.Images.PngWriter.Write(path, ScreenCapture.Width, ScreenCapture.Height, _sharedFrame);
             Console.WriteLine($"Screenshot: {path}");
         }
 
-        private void RequestSaveState(int slot) => _emulatorRequests.Enqueue(() =>
-        {
-            try
-            {
-                _session.SaveState(slot);
-                Console.WriteLine($"Saved state to {_session.StatePath(slot)}");
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Console.Error.WriteLine($"Could not save state: {ex.Message}");
-            }
-        });
-
-        private void RequestLoadState(int slot) => _emulatorRequests.Enqueue(() =>
-        {
-            try
-            {
-                Console.WriteLine(_session.LoadState(slot)
-                    ? $"Loaded state from {_session.StatePath(slot)}"
-                    : $"State slot {slot} is empty");
-            }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
-            {
-                Console.Error.WriteLine($"Could not load state: {ex.Message}");
-            }
-        });
-
         private void OnClosing()
         {
-            _running = false;
-            _emulationThread?.Join(2000);
-            _session.FlushSave();
-        }
+            _host.FrameReady -= OnFrameReady;
+            if (_audio != null)
+                _host.FrameEnded -= _audio.OnFrame;
+            _host.LocalInput = null;
+            _host.Stop();
+            _host.Invoke(() => _host.Session?.FlushSave());
 
-        // ── Emulation thread ──────────────────────────────────────────────────
-
-        private void EmulationLoop()
-        {
-            var nds = _session.Emulator;
-            var frame = new uint[ScreenCapture.Width * ScreenCapture.Height];
-            var clock = Stopwatch.StartNew();
-            double frameSeconds = 1.0 / FrameRate;
-            double nextFrame = 0;
-
-            try
-            {
-                while (_running)
-                {
-                    while (_emulatorRequests.TryDequeue(out var request))
-                        request();
-
-                    if (_paused)
-                    {
-                        Thread.Sleep(10);
-                        nextFrame = clock.Elapsed.TotalSeconds;
-                        continue;
-                    }
-
-                    _input.Apply(nds);
-                    nds.RunFrame();
-                    _audio?.OnFrame();
-
-                    ScreenCapture.Compose(nds, frame);
-                    lock (_frameLock)
-                    {
-                        frame.CopyTo(_sharedFrame, 0);
-                        _frameReady = true;
-                    }
-
-                    if (_input.FastForward)
-                    {
-                        nextFrame = clock.Elapsed.TotalSeconds;
-                        continue;
-                    }
-
-                    nextFrame += frameSeconds;
-                    double wait = nextFrame - clock.Elapsed.TotalSeconds;
-                    if (wait > 0.002)
-                        Thread.Sleep(TimeSpan.FromSeconds(wait - 0.001));
-                    while (clock.Elapsed.TotalSeconds < nextFrame)
-                        Thread.SpinWait(50);
-                    if (wait < -0.25)
-                        nextFrame = clock.Elapsed.TotalSeconds; // fell far behind: don't try to catch up
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Emulation stopped: {ex}");
-                Console.Error.WriteLine($"ARM9: {nds.Arm9}\nARM7: {nds.Arm7}");
-            }
+            // GL objects must go while the context still exists.
+            _renderer?.Dispose();
+            _renderer = null;
         }
 
         public void Dispose()
         {
-            _running = false;
             _audio?.Dispose();
             _renderer?.Dispose();
             _inputContext?.Dispose();
