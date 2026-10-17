@@ -28,6 +28,8 @@ namespace Px86.NintendoDS.Emulator.Ui
         private uint _base = 0x02000000;
         private string _gotoText = "";
         private uint? _selected;
+        private uint _markStart, _markEnd; // bytes shown highlighted (a string from the Strings window)
+        private bool _focus;
         private string _editText = "";
         private readonly byte[] _buffer = new byte[Rows * 16];
 
@@ -35,11 +37,16 @@ namespace Px86.NintendoDS.Emulator.Ui
 
         public void Open() => _open = true;
 
-        public void Show(DebugCpu cpu, uint address)
+        /// <summary>Open at <paramref name="address"/> and highlight <paramref name="length"/> bytes there.</summary>
+        public void Show(DebugCpu cpu, uint address, int length = 1)
         {
             _open = true;
+            _focus = true;
             _cpu = (int)cpu;
             _base = address & ~0xFu;
+            _selected = null;
+            _markStart = address;
+            _markEnd = address + (uint)Math.Max(length, 1);
         }
 
         public void Draw()
@@ -49,6 +56,11 @@ namespace Px86.NintendoDS.Emulator.Ui
             var viewport = ImGui.GetMainViewport();
             ImGui.SetNextWindowSize(new Vector2(Math.Min(640, viewport.Size.X - 20), Math.Min(520, viewport.Size.Y - 40)), ImGuiCond.FirstUseEver);
             ImGui.SetNextWindowPos(viewport.GetCenter(), ImGuiCond.FirstUseEver, new Vector2(0.5f, 0.5f));
+            if (_focus)
+            {
+                ImGui.SetNextWindowFocus();
+                _focus = false;
+            }
             if (ImGui.Begin("Memory", ref _open, ImGuiWindowFlags.NoCollapse))
             {
                 if (_ui.Host.Status == HostStatus.Shutdown)
@@ -116,7 +128,10 @@ namespace Px86.NintendoDS.Emulator.Ui
                             _selected = null;
                         continue;
                     }
-                    ImGui.TextUnformatted($"{value:X2}");
+                    if (address - _markStart < _markEnd - _markStart)
+                        ImGui.TextColored(new Vector4(1f, 0.8f, 0.3f, 1f), $"{value:X2}");
+                    else
+                        ImGui.TextUnformatted($"{value:X2}");
                     if (ImGui.IsItemClicked())
                     {
                         _selected = address;
