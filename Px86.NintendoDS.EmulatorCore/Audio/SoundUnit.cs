@@ -27,5 +27,11 @@ namespace Px86.NintendoDS.EmulatorCore.Audio
 
         public void Write32(uint offset, uint value) =>
             MemoryAccess.Write32(_registers, (int)(offset - REG_BASE) & ~3, value);
+
+        /// <summary>Output sample rate of <see cref="ReadSamples"/> (stereo, 16-bit).</summary>
+        public int SampleRate => 32768;
+
+        /// <summary>Copy mixed stereo samples (L, R interleaved) into <paramref name="destination"/>; returns frames written.</summary>
+        public int ReadSamples(Span<short> destination) => 0;
     }
 }

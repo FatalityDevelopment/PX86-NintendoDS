@@ -5,6 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Px86.NintendoDS.Emulator</RootNamespace>
     <AssemblyName>Px86.NintendoDS.Emulator</AssemblyName>
   </PropertyGroup>
