@@ -39,6 +39,10 @@ namespace Px86.NintendoDS.Emulator
         private volatile bool _running;
         private volatile bool _paused;
 
+        // Save-state requests are queued here and run by the emulation thread between frames.
+        private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _emulatorRequests = new();
+        private int _stateSlot;
+
         private ScreenRenderer? _renderer;
         private IInputContext? _inputContext;
         private long _framesShown;
@@ -79,6 +83,7 @@ namespace Px86.NintendoDS.Emulator
             var header = _session.Rom.Header;
             string title = $"Px86.NintendoDS — {header.Title} [{header.GameCode}]";
             if (fps > 0) title += $" — {fps:F0} fps";
+            title += $" — slot {_stateSlot}";
             if (_paused) title += " — paused";
             if (_input.FastForward) title += " — fast-forward";
             return title;
@@ -125,6 +130,17 @@ namespace Px86.NintendoDS.Emulator
                     return;
                 case Key.F12:
                     SaveScreenshot();
+                    return;
+                case Key.F5:
+                    RequestSaveState(_stateSlot);
+                    return;
+                case Key.F8:
+                    RequestLoadState(_stateSlot);
+                    return;
+                case Key.F6:
+                case Key.F7:
+                    _stateSlot = (_stateSlot + (key == Key.F7 ? 1 : GameSession.StateSlots - 1)) % GameSession.StateSlots;
+                    Console.WriteLine($"State slot {_stateSlot}");
                     return;
             }
             _input.KeyDown(key);
@@ -179,6 +195,33 @@ namespace Px86.NintendoDS.Emulator
             Console.WriteLine($"Screenshot: {path}");
         }
 
+        private void RequestSaveState(int slot) => _emulatorRequests.Enqueue(() =>
+        {
+            try
+            {
+                _session.SaveState(slot);
+                Console.WriteLine($"Saved state to {_session.StatePath(slot)}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Could not save state: {ex.Message}");
+            }
+        });
+
+        private void RequestLoadState(int slot) => _emulatorRequests.Enqueue(() =>
+        {
+            try
+            {
+                Console.WriteLine(_session.LoadState(slot)
+                    ? $"Loaded state from {_session.StatePath(slot)}"
+                    : $"State slot {slot} is empty");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Could not load state: {ex.Message}");
+            }
+        });
+
         private void OnClosing()
         {
             _running = false;
@@ -200,6 +243,9 @@ namespace Px86.NintendoDS.Emulator
             {
                 while (_running)
                 {
+                    while (_emulatorRequests.TryDequeue(out var request))
+                        request();
+
                     if (_paused)
                     {
                         Thread.Sleep(10);

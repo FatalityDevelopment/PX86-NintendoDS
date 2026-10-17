@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware
 {
     /// <summary>Buttons on the DS, as a host-side bit set.</summary>
@@ -102,6 +104,15 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
                 if (fire)
                     _irq[side].Request(InterruptController.IRQ_KEYPAD);
             }
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Keypad");
+            s.Sync(_keyControl);
+            bool hinge = HingeClosed;
+            s.Sync(ref hinge);
+            HingeClosed = hinge;
         }
     }
 }

@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware
 {
     /// <summary>
@@ -136,6 +138,18 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
                 {
                     next.Counter++;
                 }
+            }
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Timers");
+            foreach (var t in _timers)
+            {
+                s.Sync(ref t.Reload);
+                s.Sync(ref t.Control);
+                s.Sync(ref t.Counter);
+                s.Sync(ref t.BaseTime);
             }
         }
 

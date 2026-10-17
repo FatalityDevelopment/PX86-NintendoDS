@@ -43,6 +43,13 @@ namespace Px86.NintendoDS.EmulatorCore
             _wifiRegisters[0] = 0xC340; // W_ID: DS-Lite wifi chip
         }
 
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Arm7Bus");
+            s.Sync(_wifiRam);
+            s.Sync(_wifiRegisters);
+        }
+
         // ── Shared WRAM view ──────────────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

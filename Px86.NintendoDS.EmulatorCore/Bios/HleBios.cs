@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.Common.Cpu;
 using Px86.NintendoDS.Common.Interfaces;
 using Px86.NintendoDS.EmulatorCore.Hardware;
@@ -170,10 +171,20 @@ namespace Px86.NintendoDS.EmulatorCore.Bios
                     Bus.Write8(0x04000300, (byte)r[0]);
                     return true;
 
+                case 0x1F: // ARM7 CustomHalt: r2 = HALTCNT value
+                    Bus.Write8(0x04000301, (byte)r[2]);
+                    return true;
+
                 default:
                     UnsupportedSwi?.Invoke(cpu, number);
                     return true;
             }
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section(_isArm9 ? "Hle9" : "Hle7");
+            s.Sync(ref _retryingWait);
         }
 
         // ── Waiting ───────────────────────────────────────────────────────────

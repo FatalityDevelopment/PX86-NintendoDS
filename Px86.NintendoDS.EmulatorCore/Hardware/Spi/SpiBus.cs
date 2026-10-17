@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
 {
     /// <summary>
@@ -87,6 +89,17 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
 
             if ((_control & 0x4000) != 0)
                 _irq.Request(InterruptController.IRQ_SPI);
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Spi");
+            s.Sync(ref _control);
+            s.Sync(ref _data);
+            s.Sync(ref _selected);
+            Firmware.Serialize(s);
+            Touch.Serialize(s);
+            Power.Serialize(s);
         }
     }
 }

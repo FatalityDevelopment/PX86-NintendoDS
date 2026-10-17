@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
 {
     /// <summary>
@@ -839,6 +841,78 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
                 // 4-bit sign + 12-bit fraction: values ≥ 1.0 wrap.
                 VectorTestResult[i] = (short)(((result & 0x1FFF) << 3) >> 3);
             }
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Geometry");
+
+            int fifoCount = _fifo.Count;
+            s.Sync(ref fifoCount);
+            var entries = _fifo.ToArray();
+            if (s.IsReading) entries = new (byte, uint)[fifoCount];
+            for (int i = 0; i < fifoCount; i++)
+            {
+                byte command = entries[i].Command;
+                uint parameter = entries[i].Parameter;
+                s.Sync(ref command);
+                s.Sync(ref parameter);
+                entries[i] = (command, parameter);
+            }
+            if (s.IsReading)
+            {
+                _fifo.Clear();
+                foreach (var e in entries) _fifo.Enqueue(e);
+            }
+            s.Sync(_packed);
+            s.Sync(ref _packedParamsLeft);
+            s.Sync(_params);
+            s.Sync(ref _paramCount);
+            s.Sync(ref _currentCommand);
+            s.Sync(ref _hasCurrentCommand);
+            bool swap = SwapPending;
+            s.Sync(ref swap);
+            SwapPending = swap;
+
+            s.Sync(ref _matrixMode);
+            s.Sync(_projection); s.Sync(_position); s.Sync(_vector); s.Sync(_texture); s.Sync(_clip);
+            s.Sync(ref _clipDirty);
+            s.Sync(_projectionStack); s.Sync(_textureStack);
+            foreach (var m in _positionStack) s.Sync(m);
+            foreach (var m in _vectorStack) s.Sync(m);
+            s.Sync(ref _projectionSp); s.Sync(ref _positionSp); s.Sync(ref _stackError);
+
+            s.Sync(ref _vx); s.Sync(ref _vy); s.Sync(ref _vz);
+            s.Sync(ref _colorR); s.Sync(ref _colorG); s.Sync(ref _colorB);
+            s.Sync(ref _rawS); s.Sync(ref _rawT); s.Sync(ref _s); s.Sync(ref _t);
+            s.Sync(ref _polygonAttrPending); s.Sync(ref _polygonAttr); s.Sync(ref _textureParams); s.Sync(ref _paletteBase);
+            s.Sync(ref _primitive); s.Sync(ref _inList);
+            for (int i = 0; i < _strip.Length; i++) Polygon3D.Serialize(ref _strip[i], s);
+            s.Sync(ref _stripCount); s.Sync(ref _listVertexCount); s.Sync(ref _stripOdd);
+            s.Sync(ref _viewportX1); s.Sync(ref _viewportY1); s.Sync(ref _viewportX2); s.Sync(ref _viewportY2);
+
+            for (int i = 0; i < 4; i++)
+            {
+                s.Sync(_lightVector[i]); s.Sync(_halfVector[i]); s.Sync(_lightColor[i]);
+            }
+            s.Sync(_diffuse); s.Sync(_ambient); s.Sync(_specular); s.Sync(_emission);
+            s.Sync(ref _shininessTableEnabled);
+            s.Sync(_shininess);
+
+            bool box = BoxTestResult;
+            s.Sync(ref box);
+            BoxTestResult = box;
+            s.Sync(PositionTestResult);
+            s.Sync(VectorTestResult);
+
+            s.Sync(_building, () => new Polygon3D(), (p, ser) => p.Serialize(ser));
+            s.Sync(ref _buildingVertices);
+            s.Sync(ref _swapWBuffer); s.Sync(ref _swapManualSort);
+            var render = RenderList;
+            s.Sync(render, () => new Polygon3D(), (p, ser) => p.Serialize(ser));
+            bool wBuffer = RenderWBuffer, manual = RenderManualSort, overflow = RamOverflow;
+            s.Sync(ref wBuffer); s.Sync(ref manual); s.Sync(ref overflow);
+            RenderWBuffer = wBuffer; RenderManualSort = manual; RamOverflow = overflow;
         }
     }
 }

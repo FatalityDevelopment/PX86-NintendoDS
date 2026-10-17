@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.Common.Cpu;
 
 namespace Px86.NintendoDS.EmulatorCore.Hardware
@@ -94,6 +95,14 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
             if (pending)
                 _cpu.Halted = false;
             _cpu.IrqLine = pending && Ime != 0;
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Irq");
+            s.Sync(() => Ime, v => Ime = v);
+            s.Sync(() => Ie, v => Ie = v);
+            s.Sync(() => If, v => If = v);
         }
     }
 }

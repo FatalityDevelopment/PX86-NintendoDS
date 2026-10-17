@@ -189,6 +189,23 @@ namespace Px86.NintendoDS.Common.Cpu.Coprocessors
             }
         }
 
+        public void Serialize(Core.StateSerializer s)
+        {
+            s.Section("Cp15");
+            s.Sync(ref _control);
+            s.Sync(ref _dtcmRegion);
+            s.Sync(ref _itcmRegion);
+            s.Sync(_protectionRegions);
+            s.Sync(() => DataCacheBits, v => DataCacheBits = v);
+            s.Sync(() => InstructionCacheBits, v => InstructionCacheBits = v);
+            s.Sync(() => WriteBufferBits, v => WriteBufferBits = v);
+            s.Sync(() => DataAccessPermission, v => DataAccessPermission = v);
+            s.Sync(() => InstructionAccessPermission, v => InstructionAccessPermission = v);
+            s.Sync(() => ProcessId, v => ProcessId = v);
+            if (s.IsReading)
+                Apply();
+        }
+
         /// <summary>Direct-boot shortcut: write the values the firmware leaves behind.</summary>
         public void SetState(uint control, uint dtcmRegion, uint itcmRegion)
         {

@@ -12,11 +12,11 @@
 | Cartridge protocol + saves | ✅ Done | Save type auto-detect; KEY2 not simulated (not needed) |
 | Direct boot + HLE BIOS | ✅ Done | All common SWIs including callback decompression |
 | Real BIOS/firmware boot | 🧪 Untested | Implemented (KEY1); needs user dumps to verify |
-| 2D engines | ✅ Done | Display capture and OBJ mosaic still missing |
-| Frontend (Silk.NET) | ✅ Done | Window, input, touch, fast-forward, screenshots, settings |
-| 3D engine | 🚧 Next | Geometry engine + software rasterizer |
-| Sound (SPU) | 🚧 Next | 16 channels, PCM/ADPCM/PSG, capture |
-| Save states | ⏳ Planned | |
+| 2D engines | ✅ Done | Includes display capture; OBJ mosaic still missing |
+| Frontend (Silk.NET) | ✅ Done | Window, input, touch, fast-forward, screenshots, save-state hotkeys, settings; no file drop yet |
+| 3D engine | ✅ Done | Geometry engine, clipping, lighting, all texture formats, software rasterizer; no anti-aliasing or 1-dot depth culling |
+| Sound (SPU) | ✅ Done | 16 channels, PCM/ADPCM/PSG/noise, capture, OpenAL output |
+| Save states | ✅ Done | 10 slots per game (F5/F8); determinism covered by tests |
 | Performance work | ⏳ Planned | Interpreter fast paths, memory page tables, maybe a JIT |
 | Wifi / microphone | ⏳ Later | Stubbed |
 

@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 
 namespace Px86.NintendoDS.EmulatorCore.Video
@@ -95,6 +96,16 @@ namespace Px86.NintendoDS.EmulatorCore.Video
             // Writable for console linking; only honoured in the VBlank window GBATEK recommends.
             if (VCount >= 202 && VCount <= 212 && value >= 202 && value <= 212)
                 VCount = value;
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Lcd");
+            s.Sync(_dispstat);
+            int vcount = VCount;
+            s.Sync(ref vcount);
+            VCount = vcount;
+            s.Sync(ref _lineStart);
         }
 
         // ── Events ────────────────────────────────────────────────────────────

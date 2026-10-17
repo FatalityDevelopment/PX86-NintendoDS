@@ -37,9 +37,16 @@ With a firmware dump, your nickname, language and touch-screen calibration come 
 | Touch screen | Left mouse button on the bottom screen | — |
 | Fast-forward | Hold Tab | Right trigger |
 | Pause | P | — |
+| Save state / load state | F5 / F8 | — |
+| Previous / next state slot | F6 / F7 (slots 0–9, shown in the title bar) | — |
 | Fullscreen | F11 | — |
 | Screenshot | F12 (saved to Pictures/Px86.NintendoDS) | — |
 | Quit | Esc | — |
+
+Save states are written next to the ROM as `game.st0` … `game.st9`. A state is the whole
+machine, including the cartridge save memory at that moment, so loading an old state also rolls
+the in-game save back; the `.sav` file is only rewritten the next time the game saves. States are
+tied to the game (its game code) and to this emulator's state format version.
 
 Keyboard bindings can be changed in `settings.json` (`KeyBindings` maps a Silk.NET key name to a DS button).
 

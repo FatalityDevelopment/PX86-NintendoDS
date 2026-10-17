@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware
 {
     /// <summary>
@@ -86,5 +88,16 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
 
         public void WritePowerControl7(ushort value, ushort mask = 0xFFFF) =>
             PowerControl7 = (ushort)((PowerControl7 & ~mask) | (value & mask & 0x0003));
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("SystemControl");
+            ushort exmem = ExMemControl, exmem7 = ExMemStatus7, pow9 = PowerControl9, pow7 = PowerControl7;
+            byte wram = WramMode, post9 = PostFlag9, post7 = PostFlag7;
+            s.Sync(ref exmem); s.Sync(ref exmem7); s.Sync(ref pow9); s.Sync(ref pow7);
+            s.Sync(ref wram); s.Sync(ref post9); s.Sync(ref post7);
+            ExMemControl = exmem; ExMemStatus7 = exmem7; PowerControl9 = pow9; PowerControl7 = pow7;
+            WramMode = wram; PostFlag9 = post9; PostFlag7 = post7;
+        }
     }
 }

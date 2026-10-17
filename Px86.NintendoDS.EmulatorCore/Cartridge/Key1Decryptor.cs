@@ -119,6 +119,51 @@ namespace Px86.NintendoDS.EmulatorCore.Cartridge
             };
         }
 
+        /// <summary>True if the 2 KB at ROM 4000h start with the decrypted marker (E7FFDEFFh ×2).</summary>
+        public static bool IsSecureAreaDecrypted(ReadOnlySpan<byte> rom) =>
+            rom.Length >= 0x4008 &&
+            BinaryPrimitives.ReadUInt32LittleEndian(rom[0x4000..]) == 0xE7FFDEFFu &&
+            BinaryPrimitives.ReadUInt32LittleEndian(rom[0x4004..]) == 0xE7FFDEFFu;
+
+        /// <summary>True if the secure area is all zero (homebrew with no secure area).</summary>
+        public static bool IsSecureAreaEmpty(ReadOnlySpan<byte> rom) =>
+            rom.Length < 0x4800 || !rom.Slice(0x4000, 0x800).ContainsAnyExcept((byte)0);
+
+        /// <summary>
+        /// Decrypt the first 2 KB of an encrypted secure area in place, the way
+        /// the BIOS does after loading it: level 2 on the first 8 bytes, then
+        /// level 3 over all 2 KB. Returns false if the "encryObj" check fails
+        /// (wrong key or not encrypted), in which case the data is left untouched.
+        /// </summary>
+        public bool DecryptSecureArea(Span<byte> area)
+        {
+            if (area.Length < 0x800)
+                return false;
+            var copy = area[..0x800].ToArray();
+
+            uint lo = BinaryPrimitives.ReadUInt32LittleEndian(copy);
+            uint hi = BinaryPrimitives.ReadUInt32LittleEndian(copy.AsSpan(4));
+            Decrypt(_level2, ref lo, ref hi);
+            BinaryPrimitives.WriteUInt32LittleEndian(copy, lo);
+            BinaryPrimitives.WriteUInt32LittleEndian(copy.AsSpan(4), hi);
+
+            for (int i = 0; i < 0x800; i += 8)
+            {
+                lo = BinaryPrimitives.ReadUInt32LittleEndian(copy.AsSpan(i));
+                hi = BinaryPrimitives.ReadUInt32LittleEndian(copy.AsSpan(i + 4));
+                Decrypt(_level3, ref lo, ref hi);
+                BinaryPrimitives.WriteUInt32LittleEndian(copy.AsSpan(i), lo);
+                BinaryPrimitives.WriteUInt32LittleEndian(copy.AsSpan(i + 4), hi);
+            }
+
+            if (!copy.AsSpan(0, 8).SequenceEqual("encryObj"u8))
+                return false;
+            BinaryPrimitives.WriteUInt32LittleEndian(copy, 0xE7FFDEFFu);
+            BinaryPrimitives.WriteUInt32LittleEndian(copy.AsSpan(4), 0xE7FFDEFFu);
+            copy.CopyTo(area);
+            return true;
+        }
+
         /// <summary>Replace the first 2 KB of a secure-area block read with its encrypted form.</summary>
         public void EncryptSecureArea(Span<byte> data, uint blockAddress)
         {

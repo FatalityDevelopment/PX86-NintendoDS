@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.Common.Cpu;
 using Px86.NintendoDS.Common.Cpu.Coprocessors;
 using Px86.NintendoDS.EmulatorCore.Audio;
@@ -240,6 +241,84 @@ namespace Px86.NintendoDS.EmulatorCore
             if (Rom == null)
                 throw new InvalidOperationException("No ROM loaded.");
             DirectBoot.Apply(this, Rom);
+        }
+
+        // ── Save states ───────────────────────────────────────────────────────
+
+        public const string StateMagic = "PX86-NDS-STATE";
+        public const int StateVersion = 1;
+
+        /// <summary>Write the complete machine state (memory, CPUs, every device) to <paramref name="stream"/>.</summary>
+        public void SaveState(Stream stream) => SerializeState(StateSerializer.ForWriting(stream));
+
+        /// <summary>
+        /// Restore a state written by <see cref="SaveState"/> for the same game.
+        /// Throws <see cref="InvalidDataException"/> for a state from another
+        /// game or version; the emulator is unchanged in that case only if the
+        /// header check fails (later failures leave it partially loaded).
+        /// </summary>
+        public void LoadState(Stream stream) => SerializeState(StateSerializer.ForReading(stream));
+
+        private void SerializeState(StateSerializer s)
+        {
+            string magic = StateMagic;
+            int version = StateVersion;
+            string game = Rom?.Header.GameCode ?? "";
+            s.Sync(ref magic);
+            s.Sync(ref version);
+            s.Sync(ref game);
+            if (s.IsReading)
+            {
+                if (magic != StateMagic)
+                    throw new InvalidDataException("Not a Px86.NintendoDS save state.");
+                if (version != StateVersion)
+                    throw new InvalidDataException($"Save state version {version} is not supported (expected {StateVersion}).");
+                if (game != (Rom?.Header.GameCode ?? ""))
+                    throw new InvalidDataException($"Save state is for game {game}, not {Rom?.Header.GameCode}.");
+            }
+
+            s.Section("Memory");
+            s.Sync(MainRam);
+            s.Sync(SharedWram);
+            s.Sync(Arm7Wram);
+            s.Sync(Palette);
+            s.Sync(Oam);
+
+            Scheduler.Serialize(s);
+            Arm9.Serialize(s);
+            Arm7.Serialize(s);
+            Cp15.Serialize(s);
+            Arm9Bus.Serialize(s);
+            Arm7Bus.Serialize(s);
+            Vram.Serialize(s);
+            Irq9.Serialize(s);
+            Irq7.Serialize(s);
+            Timers9.Serialize(s);
+            Timers7.Serialize(s);
+            Dma9.Serialize(s);
+            Dma7.Serialize(s);
+            Ipc.Serialize(s);
+            Math.Serialize(s);
+            Keypad.Serialize(s);
+            Rtc.Serialize(s);
+            Control.Serialize(s);
+            Spi.Serialize(s);
+            Cartridge.Serialize(s);
+            Lcd.Serialize(s);
+            EngineA.Serialize(s);
+            EngineB.Serialize(s);
+            Gpu3D.Serialize(s);
+            Sound.Serialize(s);
+            Hle9.Serialize(s);
+            Hle7.Serialize(s);
+
+            s.Section("Loop");
+            s.Sync(ref _arm9Time);
+            s.Sync(ref _arm7Time);
+            long frames = FrameCount;
+            s.Sync(ref frames);
+            FrameCount = frames;
+            s.Section("End");
         }
 
         // ── Main loop ─────────────────────────────────────────────────────────

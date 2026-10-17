@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.Common.Interfaces;
 
 namespace Px86.NintendoDS.EmulatorCore.Hardware
@@ -239,6 +240,25 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
             {
                 c.Control &= ~0x80000000u;
             }
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Dma");
+            foreach (var c in _channels)
+            {
+                s.Sync(ref c.Source);
+                s.Sync(ref c.Destination);
+                s.Sync(ref c.Control);
+                s.Sync(ref c.CurrentSource);
+                s.Sync(ref c.CurrentDestination);
+                s.Sync(ref c.Remaining);
+                s.SyncEnum(ref c.Timing);
+            }
+            s.Sync(_fill);
+            int pending = PendingCycles;
+            s.Sync(ref pending);
+            PendingCycles = pending;
         }
     }
 }

@@ -71,6 +71,15 @@ namespace Px86.NintendoDS.EmulatorCore
 
         private bool Dma => _nds.Dma9.Active;
 
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Arm9Bus");
+            s.Sync(Itcm);
+            s.Sync(Dtcm);
+            if (s.IsReading)
+                UpdateTcm();
+        }
+
         // ── CPU interface ─────────────────────────────────────────────────────
 
         public uint Fetch32(uint address)

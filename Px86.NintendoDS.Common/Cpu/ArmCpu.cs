@@ -539,6 +539,30 @@ namespace Px86.NintendoDS.Common.Cpu
             Branched = false;
         }
 
+        public void Serialize(Core.StateSerializer s)
+        {
+            s.Section("ArmCpu");
+            s.Sync(R);
+            s.Sync(_bankR13);
+            s.Sync(_bankR14);
+            s.Sync(_bankSpsr);
+            s.Sync(_usrR8to12);
+            s.Sync(_fiqR8to12);
+            s.Sync(ref _cpsr);
+            s.Sync(ref _pc);
+            bool halted = Halted, irq = IrqLine;
+            long cycles = TotalCycles;
+            uint exceptionBase = ExceptionBase;
+            s.Sync(ref halted);
+            s.Sync(ref irq);
+            s.Sync(ref cycles);
+            s.Sync(ref exceptionBase);
+            Halted = halted;
+            IrqLine = irq;
+            TotalCycles = cycles;
+            ExceptionBase = exceptionBase;
+        }
+
         public override string ToString()
         {
             var sb = new System.Text.StringBuilder();

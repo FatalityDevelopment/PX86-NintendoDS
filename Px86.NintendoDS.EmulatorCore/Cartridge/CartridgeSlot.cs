@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.EmulatorCore.Hardware;
 using Px86.NintendoDS.FileFormats.Rom;
 
@@ -307,6 +308,22 @@ namespace Px86.NintendoDS.EmulatorCore.Cartridge
         {
             if (cpu == Owner && (_romControl & 0x00800000u) != 0)
                 _dma[Owner].Trigger(DmaTiming.Cartridge);
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Cartridge");
+            s.Sync(_command);
+            s.Sync(ref _spiControl); s.Sync(ref _spiData); s.Sync(ref _romControl);
+            _transfer = s.SyncVariable(_transfer);
+            s.Sync(ref _transferLength); s.Sync(ref _transferPosition); s.Sync(ref _dataLatch);
+            var mode = Mode;
+            s.SyncEnum(ref mode);
+            Mode = mode;
+            int owner = Owner;
+            s.Sync(ref owner);
+            Owner = owner;
+            Save.Serialize(s);
         }
     }
 }

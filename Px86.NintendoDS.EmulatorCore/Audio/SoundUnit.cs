@@ -466,6 +466,25 @@ namespace Px86.NintendoDS.EmulatorCore.Audio
             }
         }
 
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Sound");
+            foreach (var c in _channels)
+            {
+                s.Sync(ref c.Control); s.Sync(ref c.Source); s.Sync(ref c.Timer); s.Sync(ref c.LoopStart); s.Sync(ref c.Length);
+                s.Sync(ref c.Active); s.Sync(ref c.TimerAccumulator); s.Sync(ref c.Position); s.Sync(ref c.AdpcmNibble);
+                s.Sync(ref c.Sample); s.Sync(ref c.AdpcmValue); s.Sync(ref c.AdpcmIndex); s.Sync(ref c.LoopAdpcmValue);
+                s.Sync(ref c.LoopAdpcmIndex); s.Sync(ref c.LoopStateSaved); s.Sync(ref c.PsgStep); s.Sync(ref c.NoiseLfsr);
+            }
+            foreach (var cap in _captures)
+            {
+                s.Sync(ref cap.Control); s.Sync(ref cap.Destination); s.Sync(ref cap.Length);
+                s.Sync(ref cap.Active); s.Sync(ref cap.Position); s.Sync(ref cap.TimerAccumulator);
+            }
+            s.Sync(ref _soundControl);
+            s.Sync(ref _bias);
+        }
+
         // ── Output buffer ─────────────────────────────────────────────────────
 
         private void Push(short l, short r)

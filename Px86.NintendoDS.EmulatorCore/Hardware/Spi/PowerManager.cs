@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
 {
     /// <summary>
@@ -60,5 +62,13 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
         }
 
         public void Deselect() => _index = -1;
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Power");
+            s.Sync(_registers);
+            s.Sync(ref _index);
+            s.Sync(ref _read);
+        }
     }
 }

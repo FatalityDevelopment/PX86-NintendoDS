@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
 {
     /// <summary>
@@ -74,5 +76,11 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
         }
 
         public void Deselect() { }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Touch");
+            s.Sync(ref _x); s.Sync(ref _y); s.Sync(ref _penDown); s.Sync(ref _result); s.Sync(ref _byteIndex);
+        }
     }
 }

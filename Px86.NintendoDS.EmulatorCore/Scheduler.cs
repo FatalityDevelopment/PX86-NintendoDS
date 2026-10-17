@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore
 {
     /// <summary>Every kind of timed event in the system. One slot each.</summary>
@@ -122,6 +124,20 @@ namespace Px86.NintendoDS.EmulatorCore
             for (int i = 0; i < _times.Length; i++)
                 if (_active[i] && _times[i] < next)
                     next = _times[i];
+            NextEventTime = next;
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Scheduler");
+            s.Sync(_times);
+            s.Sync(_active);
+            long now = Now, current = CurrentTime, next = NextEventTime;
+            s.Sync(ref now);
+            s.Sync(ref current);
+            s.Sync(ref next);
+            Now = now;
+            CurrentTime = current;
             NextEventTime = next;
         }
     }

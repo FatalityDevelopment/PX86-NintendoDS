@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using Px86.NintendoDS.EmulatorCore.Hardware.Spi;
 
 namespace Px86.NintendoDS.EmulatorCore.Cartridge
@@ -261,6 +262,20 @@ namespace Px86.NintendoDS.EmulatorCore.Cartridge
             }
             _step = 0;
             _command = 0;
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Save");
+            var type = Type;
+            s.SyncEnum(ref type);
+            if (s.IsReading && type != Type)
+            {
+                _data = Array.Empty<byte>();
+                SetType(type);
+            }
+            _data = s.SyncVariable(_data);
+            s.Sync(ref _command); s.Sync(ref _step); s.Sync(ref _address); s.Sync(ref _writeEnabled); s.Sync(ref _status);
         }
 
         // ── Auto-detection ────────────────────────────────────────────────────

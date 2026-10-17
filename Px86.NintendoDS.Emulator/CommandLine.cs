@@ -87,7 +87,8 @@ namespace Px86.NintendoDS.Emulator
 
             Controls (default): arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,
             Enter = Start, Backspace = Select, mouse = touch screen, Tab = fast-forward,
-            P = pause, F11 = fullscreen, Esc = quit. Gamepads are supported.
+            P = pause, F5 = save state, F8 = load state, F6/F7 = state slot,
+            F11 = fullscreen, F12 = screenshot, Esc = quit. Gamepads are supported.
             """;
     }
 }

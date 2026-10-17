@@ -191,6 +191,25 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
             }
         }
 
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Gpu3D");
+            s.Sync(ref _settings.Disp3DControl);
+            s.Sync(ref _settings.ClearColor);
+            s.Sync(ref _settings.ClearDepth);
+            s.Sync(ref _settings.ClearImageOffset);
+            s.Sync(ref _settings.AlphaTestRef);
+            s.Sync(ref _settings.FogColor);
+            s.Sync(ref _settings.FogOffset);
+            s.Sync(_settings.FogTable);
+            s.Sync(_settings.ToonTable);
+            s.Sync(_settings.EdgeColors);
+            s.Sync(ref _gxstatIrqMode);
+            Geometry.Serialize(s);
+            if (s.IsReading && HasOutput)
+                Rasterizer.Render(Geometry.RenderList, Geometry.RenderManualSort, _settings);
+        }
+
         // ── FIFO IRQ / DMA ────────────────────────────────────────────────────
 
         private void OnFifoDrained()

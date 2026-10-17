@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
 {
     /// <summary>A vertex after transformation (clip space) and, once the polygon is finished, in screen space.</summary>
@@ -35,5 +37,25 @@ namespace Px86.NintendoDS.EmulatorCore.Video.Gpu3D
         public int Alpha => (int)(Attributes >> 16) & 0x1F;
         public int Mode => (int)(Attributes >> 4) & 3;
         public int PolygonId => (int)(Attributes >> 24) & 0x3F;
+
+        public static void Serialize(ref Vertex3D v, StateSerializer s)
+        {
+            s.Sync(ref v.X); s.Sync(ref v.Y); s.Sync(ref v.Z); s.Sync(ref v.W);
+            s.Sync(ref v.R); s.Sync(ref v.G); s.Sync(ref v.B);
+            s.Sync(ref v.S); s.Sync(ref v.T);
+            s.Sync(ref v.ScreenX); s.Sync(ref v.ScreenY); s.Sync(ref v.Depth);
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Sync(ref VertexCount);
+            if (s.IsReading)
+                Vertices = new Vertex3D[VertexCount];
+            for (int i = 0; i < VertexCount; i++)
+                Serialize(ref Vertices[i], s);
+            s.Sync(ref Attributes); s.Sync(ref TextureParams); s.Sync(ref PaletteBase);
+            s.Sync(ref WBuffer); s.Sync(ref FrontFacing); s.Sync(ref Translucent);
+            s.Sync(ref MinY); s.Sync(ref MaxY);
+        }
     }
 }

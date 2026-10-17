@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware
 {
     /// <summary>
@@ -165,6 +167,20 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
         {
             ulong value = (SqrtControl & 1) != 0 ? SqrtParameter : SqrtParameter & 0xFFFFFFFFul;
             SqrtResult = IntegerSquareRoot(value);
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Math");
+            ushort divControl = DivControl, sqrtControl = SqrtControl;
+            ulong numerator = DivNumerator, denominator = DivDenominator, result = DivResult, remainder = DivRemainder, parameter = SqrtParameter;
+            uint sqrt = SqrtResult;
+            s.Sync(ref divControl); s.Sync(ref sqrtControl);
+            s.Sync(ref numerator); s.Sync(ref denominator); s.Sync(ref result); s.Sync(ref remainder);
+            s.Sync(ref parameter); s.Sync(ref sqrt);
+            DivControl = divControl; SqrtControl = sqrtControl;
+            DivNumerator = numerator; DivDenominator = denominator; DivResult = result; DivRemainder = remainder;
+            SqrtParameter = parameter; SqrtResult = sqrt;
         }
 
         public static uint IntegerSquareRoot(ulong value)

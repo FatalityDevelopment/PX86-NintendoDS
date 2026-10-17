@@ -1,3 +1,4 @@
+using Px86.NintendoDS.Common.Core;
 using System.Buffers.Binary;
 using System.Text;
 using Px86.NintendoDS.FileFormats.Checksums;
@@ -162,6 +163,13 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware.Spi
             _step = 0;
             _command = 0;
             _address = 0;
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Firmware");
+            s.Sync(_data);
+            s.Sync(ref _command); s.Sync(ref _step); s.Sync(ref _address); s.Sync(ref _writeEnabled);
         }
 
         // ── Default image ─────────────────────────────────────────────────────

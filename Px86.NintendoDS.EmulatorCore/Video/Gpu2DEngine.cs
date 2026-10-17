@@ -254,6 +254,16 @@ namespace Px86.NintendoDS.EmulatorCore.Video
             return 0xFF000000u | (r << 16) | (g << 8) | b;
         }
 
+        public void Serialize(StateSerializer s)
+        {
+            s.Section(IsEngineA ? "Engine A" : "Engine B");
+            s.Sync(_regs);
+            s.Sync(_affineX);
+            s.Sync(_affineY);
+            s.Sync(ref _capturing);
+            s.Sync(Framebuffer);
+        }
+
         // ── Display capture (engine A) ────────────────────────────────────────
 
         private bool _capturing;

@@ -225,6 +225,16 @@ namespace Px86.NintendoDS.EmulatorCore.Video
             }
         }
 
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Vram");
+            foreach (var bank in _banks)
+                s.Sync(bank);
+            s.Sync(_control);
+            if (s.IsReading)
+                Remap();
+        }
+
         // ── ARM9 CPU access (0x06000000–0x06FFFFFF) ───────────────────────────
 
         public VramRegion RegionForArm9(uint address) => ((address >> 21) & 7) switch

@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware
 {
     /// <summary>
@@ -241,5 +243,17 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
         private static byte Bcd(int value) => (byte)(((value / 10) << 4) | (value % 10));
 
         private static int FromBcd(int value) => ((value >> 4) & 0xF) * 10 + (value & 0xF);
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Rtc");
+            s.Sync(ref _register); s.Sync(ref _selected); s.Sync(ref _bitIndex); s.Sync(ref _byteIndex);
+            s.Sync(ref _command); s.Sync(ref _reading); s.Sync(ref _currentByte); s.Sync(ref _outputBit);
+            s.Sync(_buffer);
+            s.Sync(ref _status1); s.Sync(ref _status2); s.Sync(ref _adjust); s.Sync(ref _free);
+            long offset = _offset.Ticks;
+            s.Sync(ref offset);
+            _offset = TimeSpan.FromTicks(offset);
+        }
     }
 }

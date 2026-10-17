@@ -1,3 +1,5 @@
+using Px86.NintendoDS.Common.Core;
+
 namespace Px86.NintendoDS.EmulatorCore.Hardware
 {
     /// <summary>
@@ -140,6 +142,16 @@ namespace Px86.NintendoDS.EmulatorCore.Hardware
             if (!remoteBefore && SendEmptyCondition(other))
                 _irq[other].Request(InterruptController.IRQ_IPC_SEND_EMPTY);
             return value;
+        }
+
+        public void Serialize(StateSerializer s)
+        {
+            s.Section("Ipc");
+            s.Sync(_send[0]);
+            s.Sync(_send[1]);
+            s.Sync(_sync);
+            s.Sync(_fifoControl);
+            s.Sync(_lastReceived);
         }
     }
 }

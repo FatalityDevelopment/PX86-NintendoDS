@@ -25,8 +25,9 @@ namespace Px86.NintendoDS.EmulatorCore
 
         private int _framesSinceSaveChange = -1;
 
-        private GameSession(NdsEmulator emulator, NdsRom rom, SaveMemory save, string savePath)
+        private GameSession(NdsEmulator emulator, NdsRom rom, SaveMemory save, string romPath, string savePath)
         {
+            RomPath = romPath;
             Emulator = emulator;
             Rom = rom;
             Save = save;
@@ -36,6 +37,7 @@ namespace Px86.NintendoDS.EmulatorCore
         public NdsEmulator Emulator { get; }
         public NdsRom Rom { get; }
         public SaveMemory Save { get; }
+        public string RomPath { get; }
         public string SavePath { get; }
 
         /// <summary>Human-readable notes about how the game was started (missing dumps, save type…).</summary>
@@ -45,7 +47,7 @@ namespace Px86.NintendoDS.EmulatorCore
         {
             var emulator = new NdsEmulator();
             var rom = NdsRom.Load(options.RomPath);
-            var session = new GameSession(emulator, rom, new SaveMemory(),
+            var session = new GameSession(emulator, rom, new SaveMemory(), options.RomPath,
                 options.SavePath ?? Path.ChangeExtension(options.RomPath, ".sav"));
 
             if (options.Bios9Path != null && options.Bios7Path != null)
@@ -82,6 +84,20 @@ namespace Px86.NintendoDS.EmulatorCore
 
             emulator.LoadRom(rom, session.Save);
             emulator.Boot();
+
+            switch (DirectBoot.SecureAreaStatus)
+            {
+                case DirectBoot.SecureArea.EncryptedNoBios:
+                    session.Messages.Add("WARNING: this ROM's secure area is encrypted. Provide your bios7.bin/bios9.bin " +
+                                         "(--bios7/--bios9) so it can be decrypted, or the game may crash.");
+                    break;
+                case DirectBoot.SecureArea.DecryptedWithBios:
+                    session.Messages.Add("Decrypted the ROM's secure area with the ARM7 BIOS key table.");
+                    break;
+                case DirectBoot.SecureArea.DecryptionFailed:
+                    session.Messages.Add("WARNING: the secure area could not be decrypted (bad BIOS dump or corrupt ROM).");
+                    break;
+            }
             emulator.FrameCompleted += session.OnFrame;
             return session;
         }
@@ -103,6 +119,51 @@ namespace Px86.NintendoDS.EmulatorCore
             string temp = SavePath + ".tmp";
             File.WriteAllBytes(temp, Save.Data);
             File.Move(temp, SavePath, overwrite: true);
+        }
+
+        // ── Save states ───────────────────────────────────────────────────────
+
+        public const int StateSlots = 10;
+
+        /// <summary>State files sit next to the ROM: <c>game.st0</c> … <c>game.st9</c>.</summary>
+        public string StatePath(int slot) => Path.ChangeExtension(RomPath, $".st{slot}");
+
+        /// <summary>
+        /// Save the whole machine to a slot. Call it between frames on the
+        /// thread that runs the emulator. The state includes the cartridge save
+        /// memory, so loading it later also rolls that back; the .sav file is
+        /// only rewritten when the game saves again.
+        /// </summary>
+        public void SaveState(int slot)
+        {
+            string path = StatePath(slot);
+            string temp = path + ".tmp";
+            using (var file = File.Create(temp))
+                Emulator.SaveState(file);
+            File.Move(temp, path, overwrite: true);
+        }
+
+        /// <summary>Load a slot. Returns false when the slot is empty; throws <see cref="InvalidDataException"/> for a bad file.</summary>
+        public bool LoadState(int slot)
+        {
+            string path = StatePath(slot);
+            if (!File.Exists(path))
+                return false;
+            // Read it whole first, so a truncated file fails before the machine is touched.
+            var data = File.ReadAllBytes(path);
+            var backup = new MemoryStream();
+            Emulator.SaveState(backup);
+            try
+            {
+                Emulator.LoadState(new MemoryStream(data, writable: false));
+            }
+            catch
+            {
+                backup.Position = 0;
+                Emulator.LoadState(backup);
+                throw;
+            }
+            return true;
         }
 
         public void Dispose() => FlushSave();
