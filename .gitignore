@@ -24,8 +24,9 @@ mono_crash.*
 x64/
 x86/
 [Ww][Ii][Nn]32/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
+# Platform build folders at the project root only (Cpu/Arm/ holds source code).
+/[Aa][Rr][Mm]/
+/[Aa][Rr][Mm]64/
 bld/
 [Bb]in/
 [Oo]bj/
