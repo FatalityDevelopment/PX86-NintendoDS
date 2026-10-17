@@ -61,6 +61,7 @@ With a firmware dump, your nickname, language and touch-screen calibration come 
 | L / R | Q / W | Shoulders |
 | Start / Select | Enter / Backspace | Start / Back |
 | Touch screen | Left mouse button on the bottom screen | — |
+| Blow into the microphone | Hold B (the "Mic" binding) | Left trigger |
 | Fast-forward | Hold Tab | Right trigger |
 | Pause / frame advance | P / N | — |
 | Reset | Ctrl+R | — |
@@ -153,6 +154,13 @@ whoever fixes the bug.
 
 `Px86.NintendoDS.Emulator --replay-gx file.gxcap` re-renders it without the game. It writes
 `file.png` and `file.txt`, a dump of every polygon and command.
+
+## Microphone
+
+Games that listen (blowing out candles, shouting) hear the PC's microphone, recorded at 16 kHz through
+SDL. Pick the device and an input gain in **Settings → Audio**. Without a microphone, hold the **Mic**
+key (B by default) or the gamepad's left trigger to send loud noise. The game must switch the DS
+microphone amplifier on itself, as on real hardware.
 
 ## Wireless: local play and online
 

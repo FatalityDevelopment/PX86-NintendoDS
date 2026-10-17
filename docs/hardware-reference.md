@@ -55,6 +55,14 @@ WRAMCNT (ARM9 04000247h): 0 = 32K to ARM9, 1 = 2nd half ARM9 / 1st half ARM7, 2 
 | 04000300h | POSTFLG / HALTCNT | 9/7 | HALTCNT is ARM7 only |
 | 04000400h | Sound channels | 7 | 16 bytes × 16 |
 
+## Microphone (ARM7)
+
+The microphone is the TSC2046's AUX input (channel 6, single-ended: command E4h for 12-bit, ECh for 8-bit).
+Reply bits follow one dummy bit, MSB first: 12-bit V arrives as (V >> 5, V << 3), 8-bit as (V >> 1, V << 7).
+Silence is 800h. Power manager register 2 bit 0 switches the amplifier on; register 3 sets the gain
+(20×, 40×, 80×, 160×). `TouchScreen.Microphone` (an `IMicrophoneSource`) is sampled at the scheduler time
+of each read.
+
 ## Wifi (ARM7)
 
 `EmulatorCore/Hardware/Wifi/WifiController.cs` documents the full register map (GBATEK "DS Wifi").

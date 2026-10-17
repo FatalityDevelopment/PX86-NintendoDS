@@ -13,7 +13,8 @@ namespace Px86.NintendoDS.Emulator
     /// Gamepads use the standard layout: D-pad/left stick = D-pad, south/east/
     /// north/west = B/A/X/Y (Nintendo positions), shoulders = L/R, Start/Back =
     /// Start/Select. The mouse (left button) on the bottom screen is the stylus.
-    /// Tab (or the right trigger) holds fast-forward.
+    /// Tab (or the right trigger) holds fast-forward. A key bound to "Mic"
+    /// (default B) or the left trigger "blows" into the microphone.
     /// </summary>
     public sealed class InputMapper
     {
@@ -24,6 +25,12 @@ namespace Px86.NintendoDS.Emulator
         private (int X, int Y)? _touch;
         private bool _fastForwardKey;
         private bool _fastForwardPad;
+        private readonly HashSet<Key> _micKeys = new();
+        private bool _micKey;
+        private bool _micPad;
+
+        /// <summary>The binding target that blows into the microphone instead of pressing a button.</summary>
+        public const string MicBinding = "Mic";
 
         public InputMapper(EmulatorSettings settings) => LoadBindings(settings);
 
@@ -35,19 +42,30 @@ namespace Px86.NintendoDS.Emulator
                 _keyMap.Clear();
                 _keyboard = NdsButton.None;
             }
+            _micKeys.Clear();
+            _micKey = false;
             foreach (var (hostKey, button) in settings.KeyBindings)
             {
-                if (Enum.TryParse<Key>(hostKey, ignoreCase: true, out var key) &&
-                    Enum.TryParse<NdsButton>(button, ignoreCase: true, out var ndsButton))
+                if (!Enum.TryParse<Key>(hostKey, ignoreCase: true, out var key))
+                    Console.Error.WriteLine($"[Input] Ignoring binding {hostKey} → {button}.");
+                else if (button.Equals(MicBinding, StringComparison.OrdinalIgnoreCase))
+                    _micKeys.Add(key);
+                else if (Enum.TryParse<NdsButton>(button, ignoreCase: true, out var ndsButton))
                     _keyMap[key] = ndsButton;
                 else
                     Console.Error.WriteLine($"[Input] Ignoring binding {hostKey} → {button}.");
             }
+            // Settings saved before the microphone existed: give it B if that key is free.
+            if (!settings.KeyBindings.Values.Any(v => v.Equals(MicBinding, StringComparison.OrdinalIgnoreCase)) && !_keyMap.ContainsKey(Key.B))
+                _micKeys.Add(Key.B);
         }
 
         public bool FastForward => _fastForwardKey || _fastForwardPad;
 
-        public bool IsBound(Key key) => _keyMap.ContainsKey(key);
+        public bool IsBound(Key key) => _keyMap.ContainsKey(key) || _micKeys.Contains(key);
+
+        /// <summary>The blow key (or left trigger) is held.</summary>
+        public bool Blowing => _micKey || _micPad;
 
         /// <summary>Release everything (focus lost, menu opened…).</summary>
         public void ReleaseAll()
@@ -58,11 +76,13 @@ namespace Px86.NintendoDS.Emulator
                 _touch = null;
             }
             _fastForwardKey = false;
+            _micKey = false;
         }
 
         public void KeyDown(Key key)
         {
             if (key == Key.Tab) { _fastForwardKey = true; return; }
+            if (_micKeys.Contains(key)) { _micKey = true; return; }
             if (_keyMap.TryGetValue(key, out var button))
                 lock (_lock) _keyboard |= button;
         }
@@ -70,6 +90,7 @@ namespace Px86.NintendoDS.Emulator
         public void KeyUp(Key key)
         {
             if (key == Key.Tab) { _fastForwardKey = false; return; }
+            if (_micKeys.Contains(key)) { _micKey = false; return; }
             if (_keyMap.TryGetValue(key, out var button))
                 lock (_lock) _keyboard &= ~button;
         }
@@ -82,7 +103,7 @@ namespace Px86.NintendoDS.Emulator
         public void PollGamepads(IReadOnlyList<IGamepad> gamepads)
         {
             NdsButton pressed = NdsButton.None;
-            bool fast = false;
+            bool fast = false, mic = false;
             foreach (var pad in gamepads)
             {
                 if (!pad.IsConnected) continue;
@@ -116,9 +137,12 @@ namespace Px86.NintendoDS.Emulator
                 }
                 if (pad.Triggers.Count > 1 && pad.Triggers[1].Position > 0.5f)
                     fast = true;
+                if (pad.Triggers.Count > 0 && pad.Triggers[0].Position > 0.5f)
+                    mic = true;
             }
             lock (_lock) _gamepad = pressed;
             _fastForwardPad = fast;
+            _micPad = mic;
         }
 
         /// <summary>The current input, for <see cref="EmulatorHost.LocalInput"/> (called by the emulation thread).</summary>

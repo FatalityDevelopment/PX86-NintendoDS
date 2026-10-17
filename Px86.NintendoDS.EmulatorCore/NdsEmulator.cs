@@ -86,6 +86,8 @@ namespace Px86.NintendoDS.EmulatorCore
             Control = new SystemControl();
             Spi = new SpiBus(Irq7, new PowerManager(), FirmwareFlash.CreateDefault(), new TouchScreen());
             Wifi = new WifiController(Scheduler, Irq7);
+            Spi.Touch.Clock = () => Scheduler.CurrentTime;
+            Spi.Touch.Amplifier = () => (Spi.Power.MicrophoneAmplifierOn, Spi.Power.MicrophoneGain);
             Cartridge = new CartridgeSlot(Scheduler, Irq9, Irq7, Dma9, Dma7);
             Lcd = new LcdController(Scheduler, Irq9, Irq7, Dma9, Dma7);
             EngineA = new Gpu2DEngine(true, Vram, Palette, Oam);

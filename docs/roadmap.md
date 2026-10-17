@@ -19,7 +19,7 @@
 | Save states | ✅ Done | 10 slots per game (F5/F8); determinism covered by tests |
 | Performance work | 🔄 Ongoing | JIT done; next: register caching in JIT blocks, memory page tables |
 | Wifi | ✅ Done | MAC/BB/RF chips, local wireless (UDP), multiplay CMD/REPLY, online via soft AP + NAT |
-| Microphone | ⏳ Next | TSC channel 6 reads a fixed level |
+| Microphone | ✅ Done | TSC channel 6 from the PC microphone (SDL capture), blow key, PM amplifier/gain |
 
 ## Compatibility
 

@@ -22,6 +22,9 @@ namespace Px86.NintendoDS.Emulator.Ui
         public required Action CaptureGx { get; init; }
         public required Action Quit { get; init; }
 
+        /// <summary>One line about the microphone (device in use, or why there is none).</summary>
+        public required Func<string> MicrophoneStatus { get; init; }
+
         /// <summary>State slot used by F5/F8.</summary>
         public int StateSlot { get; set; }
 

@@ -55,6 +55,15 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Output volume, 0–100.</summary>
         public int Volume { get; set; } = 100;
 
+        /// <summary>Record the PC's microphone for games that listen (blowing, shouting). The blow key works either way.</summary>
+        public bool MicrophoneEnabled { get; set; } = true;
+
+        /// <summary>Capture device name; empty = the system default.</summary>
+        public string? MicrophoneDevice { get; set; }
+
+        /// <summary>Software gain on the recorded sound, in percent.</summary>
+        public int MicrophoneGain { get; set; } = 100;
+
         // ── Emulation ─────────────────────────────────────────────────────────
 
         /// <summary>Speed of the "turbo" limiter mode, in percent.</summary>
@@ -142,6 +151,7 @@ namespace Px86.NintendoDS.Emulator
             ["A"] = "Y",
             ["Q"] = "L",
             ["W"] = "R",
+            ["B"] = "Mic",
             ["Enter"] = "Start",
             ["Backspace"] = "Select",
             ["ShiftRight"] = "Select",

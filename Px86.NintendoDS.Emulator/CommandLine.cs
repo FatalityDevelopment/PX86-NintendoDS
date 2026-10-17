@@ -182,7 +182,7 @@ namespace Px86.NintendoDS.Emulator
               --save-settings       Remember the BIOS/firmware/scale options
 
             Controls (default): arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,
-            Enter = Start, Backspace = Select, mouse = touch screen, Tab = fast-forward,
+            Enter = Start, Backspace = Select, mouse = touch screen, B = blow into the mic, Tab = fast-forward,
             P = pause, F9 = GX capture (3D bug report), F5 = save state, F8 = load state, F6/F7 = state slot,
             F11 = fullscreen, F12 = screenshot, Esc = quit. Gamepads are supported.
             """;

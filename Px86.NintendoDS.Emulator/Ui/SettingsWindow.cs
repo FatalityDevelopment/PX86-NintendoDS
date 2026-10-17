@@ -19,15 +19,18 @@ namespace Px86.NintendoDS.Emulator.Ui
         private static readonly string[] Rotations = { "0 deg", "90 deg", "180 deg", "270 deg" };
         private static readonly string[] Languages = { "Japanese", "English", "French", "German", "Italian", "Spanish" };
         private static readonly string[] Codecs = { "jpeg", "png", "raw" };
-        private static readonly NdsButton[] Buttons =
+        private static readonly string[] Buttons =
         {
-            NdsButton.Up, NdsButton.Down, NdsButton.Left, NdsButton.Right, NdsButton.A, NdsButton.B,
-            NdsButton.X, NdsButton.Y, NdsButton.L, NdsButton.R, NdsButton.Start, NdsButton.Select,
+            nameof(NdsButton.Up), nameof(NdsButton.Down), nameof(NdsButton.Left), nameof(NdsButton.Right), nameof(NdsButton.A), nameof(NdsButton.B),
+            nameof(NdsButton.X), nameof(NdsButton.Y), nameof(NdsButton.L), nameof(NdsButton.R), nameof(NdsButton.Start), nameof(NdsButton.Select),
+            InputMapper.MicBinding,
         };
 
         private readonly UiContext _ui;
         private bool _open;
-        private NdsButton? _rebinding;
+        private string? _rebinding;
+
+        private List<string>? _micDevices;
 
         public SettingsWindow(UiContext ui) => _ui = ui;
 
@@ -47,9 +50,9 @@ namespace Px86.NintendoDS.Emulator.Ui
             if (key == Key.Escape)
                 return;
             var bindings = _ui.Settings.KeyBindings;
-            foreach (var stale in bindings.Where(b => b.Value.Equals(button.ToString(), StringComparison.OrdinalIgnoreCase) || b.Key == key.ToString()).Select(b => b.Key).ToList())
+            foreach (var stale in bindings.Where(b => b.Value.Equals(button, StringComparison.OrdinalIgnoreCase) || b.Key == key.ToString()).Select(b => b.Key).ToList())
                 bindings.Remove(stale);
-            bindings[key.ToString()] = button.ToString();
+            bindings[key.ToString()] = button;
             _ui.ApplyInput();
         }
 
@@ -199,6 +202,33 @@ namespace Px86.NintendoDS.Emulator.Ui
                 s.Volume = volume;
                 _ui.ApplyAudio();
             }
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Microphone");
+            bool mic = s.MicrophoneEnabled;
+            if (ImGui.Checkbox("Use the PC microphone", ref mic))
+            {
+                s.MicrophoneEnabled = mic;
+                _ui.ApplyAudio();
+            }
+            _micDevices ??= MicrophoneCapture.ListDevices();
+            var devices = new[] { "System default" }.Concat(_micDevices.Select(Notifications.Ascii)).ToArray();
+            int device = Math.Max(0, _micDevices.IndexOf(s.MicrophoneDevice ?? "") + 1);
+            if (ImGui.Combo("Device", ref device, devices, devices.Length))
+            {
+                s.MicrophoneDevice = device == 0 ? null : _micDevices[device - 1];
+                _ui.ApplyAudio();
+            }
+            int gain = s.MicrophoneGain;
+            if (ImGui.SliderInt("Input gain", ref gain, 25, 400, "%d%%"))
+            {
+                s.MicrophoneGain = gain;
+                _ui.ApplyAudio();
+            }
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+            ImGui.TextWrapped(_ui.MicrophoneStatus());
+            ImGui.TextWrapped("No microphone? Hold the Mic (blow) key, default B, or the left trigger.");
+            ImGui.PopStyleColor();
         }
 
         private void InputTab()
@@ -213,9 +243,9 @@ namespace Px86.NintendoDS.Emulator.Ui
                 {
                     ImGui.TableNextRow();
                     ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(button.ToString());
+                    ImGui.TextUnformatted(button == InputMapper.MicBinding ? "Mic (blow)" : button);
                     ImGui.TableNextColumn();
-                    var keys = bindings.Where(b => b.Value.Equals(button.ToString(), StringComparison.OrdinalIgnoreCase)).Select(b => b.Key).ToList();
+                    var keys = bindings.Where(b => b.Value.Equals(button, StringComparison.OrdinalIgnoreCase)).Select(b => b.Key).ToList();
                     string label = _rebinding == button ? "press a key..." : keys.Count == 0 ? "(none)" : string.Join(", ", keys);
                     if (ImGui.Button($"{label}##{button}", new Vector2(-1, 0)))
                         _rebinding = button;
@@ -228,6 +258,7 @@ namespace Px86.NintendoDS.Emulator.Ui
                 _ui.ApplyInput();
             }
             ImGui.TextDisabled("Tab = fast-forward, P = pause, F5/F8 = save/load state, F9 = GX capture, F12 = screenshot.");
+            ImGui.TextDisabled("Mic (blow) and the gamepad's left trigger send loud noise into the microphone.");
         }
 
         private void FirmwareTab()
