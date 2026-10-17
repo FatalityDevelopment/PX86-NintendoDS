@@ -385,5 +385,7 @@ bios7*.bin
 bios9*.bin
 firmware*.bin
 roms/
+# Test ROMs built from tools/testroms are our own code.
+!Px86.NintendoDS.TestProject/TestRoms/*.nds
 screenshots/
 emulator-settings.local.json

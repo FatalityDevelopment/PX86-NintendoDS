@@ -491,6 +491,54 @@ namespace Px86.NintendoDS.Common.Cpu
             RaiseException(ProcessorMode.Undefined, VECTOR_UNDEFINED, next, disableFiq: false);
         }
 
+        // ── Snapshots (HLE guest calls, save states) ──────────────────────────
+
+        /// <summary>Complete register state of the core.</summary>
+        public sealed class Snapshot
+        {
+            public uint[] R { get; init; } = new uint[16];
+            public uint[] BankR13 { get; init; } = new uint[6];
+            public uint[] BankR14 { get; init; } = new uint[6];
+            public uint[] BankSpsr { get; init; } = new uint[6];
+            public uint[] UsrR8To12 { get; init; } = new uint[5];
+            public uint[] FiqR8To12 { get; init; } = new uint[5];
+            public uint Cpsr { get; init; }
+            public uint Pc { get; init; }
+            public bool Halted { get; init; }
+            public long TotalCycles { get; init; }
+        }
+
+        public Snapshot SaveState() => new()
+        {
+            R = (uint[])R.Clone(),
+            BankR13 = (uint[])_bankR13.Clone(),
+            BankR14 = (uint[])_bankR14.Clone(),
+            BankSpsr = (uint[])_bankSpsr.Clone(),
+            UsrR8To12 = (uint[])_usrR8to12.Clone(),
+            FiqR8To12 = (uint[])_fiqR8to12.Clone(),
+            Cpsr = _cpsr,
+            Pc = _pc,
+            Halted = Halted,
+            TotalCycles = TotalCycles,
+        };
+
+        /// <summary>Restore a snapshot. Also clears the in-flight branch flag, so it is safe inside a handler.</summary>
+        public void RestoreState(Snapshot state, bool restoreCycles = true)
+        {
+            state.R.CopyTo(R, 0);
+            state.BankR13.CopyTo(_bankR13, 0);
+            state.BankR14.CopyTo(_bankR14, 0);
+            state.BankSpsr.CopyTo(_bankSpsr, 0);
+            state.UsrR8To12.CopyTo(_usrR8to12, 0);
+            state.FiqR8To12.CopyTo(_fiqR8to12, 0);
+            _cpsr = state.Cpsr;
+            _pc = state.Pc;
+            Halted = state.Halted;
+            if (restoreCycles)
+                TotalCycles = state.TotalCycles;
+            Branched = false;
+        }
+
         public override string ToString()
         {
             var sb = new System.Text.StringBuilder();
