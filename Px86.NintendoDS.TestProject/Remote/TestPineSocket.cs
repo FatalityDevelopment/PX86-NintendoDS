@@ -225,6 +225,53 @@ namespace Px86.NintendoDS.TestProject.Remote
         }
 
         [TestMethod]
+        public void ReleasingTheLastButtonReachesTheKeypadWithoutAWindow()
+        {
+            // Headless: no LocalInput. Releasing everything (remote input back to
+            // None) must still clear the keypad and lift the pen.
+            var (f, pine, c) = Start();
+            using (f) using (pine) using (c)
+            {
+                WaitForDone(f);
+                var keypad = f.Host.Emulator!.Keypad;
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.PadSetButton, (byte)0, (byte)0, 1.0f))[4], "press A");
+                f.WaitFor(() => (keypad.KeyInput & 1) == 0, "A pressed in KEYINPUT");
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.PadSetButton, (byte)0, (byte)0, 0.0f))[4], "release A");
+                f.WaitFor(() => (keypad.KeyInput & 1) == 1, "A released in KEYINPUT");
+
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.SetTouch, (byte)1, (ushort)100, (ushort)50))[4], "pen down");
+                f.WaitFor(() => keypad.PenDown, "pen down");
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.SetTouch, (byte)0, (ushort)0, (ushort)0))[4], "pen up");
+                f.WaitFor(() => !keypad.PenDown, "pen up");
+            }
+        }
+
+        [TestMethod]
+        public void SettingsOpcodesUseTheFrontendDelegates()
+        {
+            var (f, pine, c) = Start(paused: true);
+            using (f) using (pine) using (c)
+            {
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.GetSettings))[4], "no frontend: GetSettings fails");
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.SetSettings, "{}"))[4], "no frontend: SetSettings fails");
+
+                string stored = "{\"Nickname\":\"Px86\"}";
+                pine.GetSettings = () => stored;
+                pine.SetSettings = json => { stored = json; return "{\"applied\":[],\"nextLoad\":[\"Nickname\"],\"restart\":[]}"; };
+
+                var set = c.Send(Cmd(PineOpcodes.SetSettings, "{\"Nickname\":\"Tyler\"}"));
+                Assert.AreEqual(Ok, set[4], "SetSettings");
+                StringAssert.Contains(Str(set, 5), "nextLoad", "report returned");
+                var get = c.Send(Cmd(PineOpcodes.GetSettings));
+                Assert.AreEqual(Ok, get[4], "GetSettings");
+                Assert.AreEqual("{\"Nickname\":\"Tyler\"}", Str(get, 5), "the stored settings");
+
+                pine.SetSettings = _ => throw new InvalidDataException("bad");
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.SetSettings, "nope"))[4], "invalid settings fail the reply");
+            }
+        }
+
+        [TestMethod]
         public void CheatOpcodesManageTheList()
         {
             var (f, pine, c) = Start();

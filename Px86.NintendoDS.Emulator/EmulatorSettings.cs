@@ -157,9 +157,11 @@ namespace Px86.NintendoDS.Emulator
             ["ShiftRight"] = "Select",
         };
 
+        // On Linux/macOS .NET returns "" for ApplicationData while ~/.config doesn't
+        // exist yet, which would put settings.json in the working directory; Create makes it.
         [JsonIgnore]
         public static string DefaultPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Px86.NintendoDS", "settings.json");
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "Px86.NintendoDS", "settings.json");
 
         private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 

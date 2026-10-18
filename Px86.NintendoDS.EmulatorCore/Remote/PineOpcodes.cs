@@ -94,6 +94,8 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
         public const byte CheatRemove = 0x6B;
         public const byte CheatClear = 0x6C;
         public const byte CaptureGx = 0x6F;
+        public const byte GetSettings = 0x70;
+        public const byte SetSettings = 0x71;
 
         // ── Result codes ──────────────────────────────────────────────────────
         public const byte IpcOk = 0x00;

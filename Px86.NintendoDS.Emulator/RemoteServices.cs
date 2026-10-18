@@ -24,6 +24,9 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>Local wireless / online access for the emulated Wifi hardware.</summary>
         public WirelessServices Wireless { get; }
 
+        /// <summary>Answers the PINE settings opcodes. Null: they fail.</summary>
+        public RemoteSettings? Settings { get; set; }
+
         public PineSocket? Pine { get; private set; }
         public GsStreamSocket? Gs { get; private set; }
 
@@ -58,6 +61,11 @@ namespace Px86.NintendoDS.Emulator
             try
             {
                 var pine = new PineSocket(_host, port) { GsStream = Gs, LoadOptions = path => _launcher.OptionsFor(path) };
+                if (Settings is { } settings)
+                {
+                    pine.GetSettings = settings.Get;
+                    pine.SetSettings = settings.Set;
+                }
                 pine.Log += m => Log?.Invoke(m);
                 pine.ShutdownRequested += () => ShutdownRequested?.Invoke();
                 pine.Start();

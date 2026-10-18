@@ -72,6 +72,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
         private long _framesThisSecond;
         private InputState _remoteInput = InputState.None;
         private bool _remoteInputActive;
+        private bool _remoteInputDirty;
 
         public EmulatorHost()
         {
@@ -476,6 +477,7 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
                 {
                     _remoteInput = value;
                     _remoteInputActive = value != InputState.None;
+                    _remoteInputDirty = true;
                 }
             }
         }
@@ -484,14 +486,19 @@ namespace Px86.NintendoDS.EmulatorCore.Hosting
         {
             var local = LocalInput?.Invoke() ?? InputState.None;
             InputState remote;
-            bool remoteActive;
+            bool remoteActive, remoteChanged;
             lock (_inputLock)
             {
                 remote = _remoteInput;
                 remoteActive = _remoteInputActive;
+                remoteChanged = _remoteInputDirty;
+                _remoteInputDirty = false;
             }
-            if (LocalInput == null && !remoteActive)
-                return; // nobody drives input: leave whatever was set directly
+            // Nobody drives input: leave whatever was set directly. A remote change
+            // still applies once, so releasing the last button (back to None) reaches
+            // the keypad when there is no window (headless).
+            if (LocalInput == null && !remoteActive && !remoteChanged)
+                return;
 
             var buttons = local.Buttons | remote.Buttons;
             var touch = remote.Touch ?? local.Touch;

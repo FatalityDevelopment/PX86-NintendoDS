@@ -68,6 +68,18 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
         /// <summary>Builds the options for the LoadRom opcode (BIOS paths and so on). Default: just the ROM.</summary>
         public Func<string, GameLoadOptions> LoadOptions { get; set; } = path => new GameLoadOptions { RomPath = path };
 
+        /// <summary>
+        /// Answers GetSettings with the frontend's settings as JSON. The core has no
+        /// settings of its own, so null (no frontend) makes the opcode fail.
+        /// </summary>
+        public Func<string>? GetSettings { get; set; }
+
+        /// <summary>
+        /// Applies a partial settings JSON for SetSettings and returns the JSON
+        /// report of what changed. Null makes the opcode fail.
+        /// </summary>
+        public Func<string, string>? SetSettings { get; set; }
+
         /// <summary>A client sent the Shutdown opcode.</summary>
         public event Action? ShutdownRequested;
 
@@ -677,6 +689,19 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                 case PineOpcodes.Shutdown:
                     ShutdownRequested?.Invoke();
                     return true;
+                case PineOpcodes.GetSettings:
+                    if (GetSettings == null)
+                        return false;
+                    rp.String(GetSettings());
+                    return true;
+                case PineOpcodes.SetSettings:
+                {
+                    string json = rq.Utf8(rq.U16());
+                    if (SetSettings == null)
+                        return false;
+                    rp.String(SetSettings(json));
+                    return true;
+                }
 
                 default:
                     // Threads, modules, symbols, locals, network: nothing to report on a DS.
