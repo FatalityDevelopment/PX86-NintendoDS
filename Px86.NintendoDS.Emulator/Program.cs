@@ -22,6 +22,7 @@ namespace Px86.NintendoDS.Emulator
     {
         public static int Main(string[] args)
         {
+            EmulatorLog.Install(); // the Log window's "Emulator" tab shows the console output
             CommandLine cl;
             try
             {
