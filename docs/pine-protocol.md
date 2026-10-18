@@ -153,6 +153,26 @@ Notes on specific opcodes:
 | 6B | CheatRemove | index u32 | — |
 | 6C | CheatClear | — | — |
 | 6F | CaptureGx | len u16, UTF-8 path | — (records the next 3D frame to a `.gxcap` file; see the emulator guide) |
+| 70 | GetSettings | — | string: the settings as JSON (below) |
+| 71 | SetSettings | len u16, UTF-8 JSON (only the keys to change) | string: `{"applied":[…],"nextLoad":[…],"restart":[…]}` (FAIL on bad JSON or values) |
+
+#### Settings (0x70/0x71)
+
+The emulator's own settings (`settings.json`), minus the window-only ones (layout, audio, microphone, keys).
+Names are case-insensitive on write, unknown keys are ignored, and numbers are clamped. A change is saved
+to `settings.json` without this run's command-line overrides. Both opcodes FAIL when the emulator has no
+frontend (an `EmulatorCore` host on its own).
+
+| Key | Type | Takes effect |
+|---|---|---|
+| `CpuMode` | `Interpreter` / `Cached` / `Jit` | applied |
+| `TurboPercent` | int 10–1000 (limiter mode 1) | applied |
+| `WirelessMode` (`Off`/`Local`/`Online`), `WirelessPort`, `WirelessLan`, `OnlineDns` | | applied |
+| `Bios9Path`, `Bios7Path`, `FirmwarePath` (empty = none), `UseRealBios`, `SaveDirectory` | | nextLoad |
+| `Nickname` (≤ 10), `Message` (≤ 26), `BirthMonth`, `BirthDay`, `Language` (0 JP, 1 EN, 2 FR, 3 DE, 4 IT, 5 ES), `FavoriteColor` (0–15) | | nextLoad (generated firmware) |
+| `PinePort`, `GsPort`, `GsCodec` (`jpeg`/`png`/`raw`), `GsQuality` | | restart |
+
+`nextLoad` keys apply when the next game is loaded (LoadRom); `restart` keys when the emulator next starts.
 
 ## GS stream format
 

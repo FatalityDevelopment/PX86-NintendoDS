@@ -90,6 +90,8 @@ namespace Px86.NintendoDS.Emulator
                                                      (b.Reason == EmulatorCore.Debugging.BreakReason.Watchpoint ? $" ({(b.IsWrite ? "write" : "read")} {b.Address:X8})" : ""));
 
             using var remote = new RemoteServices(host, launcher);
+            remote.Settings = new RemoteSettings(settings, host, remote.Wireless);
+            host.TurboSpeed = settings.TurboPercent / 100.0;
             using var shutdown = new ManualResetEventSlim();
             remote.ShutdownRequested += shutdown.Set;
             if (cl.ServerMode)
