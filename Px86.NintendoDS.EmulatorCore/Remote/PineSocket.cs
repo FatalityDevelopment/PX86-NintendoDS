@@ -686,6 +686,35 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                     return _host.CaptureGx(path, (file, error) =>
                         Log?.Invoke(error == null ? $"[PINE] GX capture written to {file}" : $"[PINE] GX capture failed: {error.Message}"));
                 }
+                case PineOpcodes.HookList:
+                {
+                    if (nds == null) return false;
+                    var hooks = nds.Hooks.List();
+                    rp.U32((uint)hooks.Count);
+                    foreach (var hook in hooks)
+                    {
+                        rp.U8((byte)hook.Cpu);
+                        rp.U32(hook.Address);
+                        rp.U8((byte)hook.Kind);
+                        rp.U8(hook.Automatic ? (byte)1 : (byte)0);
+                    }
+                    return true;
+                }
+                case PineOpcodes.HookAdd:
+                {
+                    byte hookCpu = rq.U8();
+                    uint address = rq.U32();
+                    byte kind = rq.U8();
+                    if (nds == null || hookCpu > 1 || !Enum.IsDefined((EmulatorCore.Debugging.HookKind)kind)) return false;
+                    nds.Hooks.Add((DebugCpu)hookCpu, address, (EmulatorCore.Debugging.HookKind)kind);
+                    return true;
+                }
+                case PineOpcodes.HookRemove:
+                {
+                    byte hookCpu = rq.U8();
+                    uint address = rq.U32();
+                    return nds != null && hookCpu <= 1 && nds.Hooks.Remove((DebugCpu)hookCpu, address);
+                }
                 case PineOpcodes.Shutdown:
                     ShutdownRequested?.Invoke();
                     return true;

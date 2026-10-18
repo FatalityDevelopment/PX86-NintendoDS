@@ -28,6 +28,9 @@ namespace Px86.NintendoDS.Emulator.Ui
         private readonly List<EmulatorLogLine> _emu = new();
         private long _emuNext;
         private bool _gameTab;
+        private int _hookCpu, _hookKind;
+        private string _hookAddress = "";
+        private string? _hookError;
 
         public LogWindow(UiContext ui) => _ui = ui;
 
@@ -182,6 +185,91 @@ namespace Px86.NintendoDS.Emulator.Ui
             ImGui.EndChild();
         }
 
+        /// <summary>
+        /// The printf/sprintf hooks of the running game: found by the scanner or added
+        /// here. Added ones are kept per game code in the settings (GameHooks).
+        /// </summary>
+        private void DrawHooks()
+        {
+            if (!ImGui.BeginPopup("hooks"))
+                return;
+            var host = _ui.Host;
+            var settings = _ui.Settings;
+            string? game = host.Session?.Rom.Header.GameCode;
+            if (game == null)
+            {
+                ImGui.TextUnformatted("Start a game first.");
+                ImGui.EndPopup();
+                return;
+            }
+
+            bool enabled = settings.PrintfHooks, scan = settings.PrintfAutoScan;
+            if (ImGui.Checkbox("Show printf/sprintf output", ref enabled) | ImGui.Checkbox("Find printf functions in the game's code", ref scan))
+            {
+                settings.PrintfHooks = enabled;
+                settings.PrintfAutoScan = scan;
+                host.Invoke(() =>
+                {
+                    if (host.Emulator is not { } nds) return;
+                    nds.Hooks.Enabled = enabled;
+                    nds.Hooks.AutoScan = scan;
+                    if (scan) nds.Hooks.ScanNow();
+                });
+                _ui.Launcher.TrySaveSettings();
+            }
+            ImGui.Separator();
+
+            var hooks = host.Invoke(() => host.Emulator?.Hooks.List()) ?? Array.Empty<FunctionHook>();
+            if (hooks.Count == 0)
+                ImGui.TextDisabled("No hooks yet.");
+            foreach (var hook in hooks)
+            {
+                ImGui.PushID(FunctionHooks.Format(hook));
+                if (ImGui.SmallButton("x"))
+                {
+                    host.Invoke(() => host.Emulator?.Hooks.Remove(hook.Cpu, hook.Address));
+                    if (settings.GameHooks.TryGetValue(game, out var saved)
+                        && saved.RemoveAll(s => FunctionHooks.TryParse(s, out var c, out uint a, out _) && c == hook.Cpu && (a & ~1u) == hook.Address) > 0)
+                        _ui.Launcher.TrySaveSettings();
+                }
+                ImGui.SameLine();
+                ImGui.TextUnformatted($"{(hook.Cpu == DebugCpu.Arm9 ? "ARM9" : "ARM7")} {hook.Address:X8}  {hook.Kind,-9}  {(hook.Automatic ? "found by scan" : hook.Name)}");
+                ImGui.PopID();
+            }
+            ImGui.Separator();
+
+            ImGui.SetNextItemWidth(70);
+            ImGui.Combo("##hookcpu", ref _hookCpu, "ARM9\0ARM7\0");
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(100);
+            ImGui.InputTextWithHint("##hookaddr", "address (hex)", ref _hookAddress, 16);
+            ImGui.SameLine();
+            var kinds = Enum.GetNames<HookKind>();
+            ImGui.SetNextItemWidth(100);
+            ImGui.Combo("##hookkind", ref _hookKind, string.Join('\0', kinds) + "\0");
+            ImGui.SameLine();
+            if (ImGui.Button("Add"))
+            {
+                string spec = $"{(_hookCpu == 0 ? "arm9" : "arm7")}:{_hookAddress.Trim()}:{kinds[_hookKind].ToLowerInvariant()}";
+                if (FunctionHooks.TryParse(spec, out var cpu, out uint address, out var kind))
+                {
+                    _hookError = null;
+                    host.Invoke(() => host.Emulator?.Hooks.Add(cpu, address, kind));
+                    if (!settings.GameHooks.TryGetValue(game, out var saved))
+                        settings.GameHooks[game] = saved = new List<string>();
+                    saved.Add(spec);
+                    _ui.Launcher.TrySaveSettings();
+                    _hookAddress = "";
+                }
+                else
+                    _hookError = "The address must be hexadecimal, e.g. 0201A3C4.";
+            }
+            if (_hookError != null)
+                ImGui.TextColored(new Vector4(1, 0.55f, 0.45f, 1), _hookError);
+            ImGui.TextDisabled("Hook the first instruction of the function. Saved for this game.");
+            ImGui.EndPopup();
+        }
+
         private void DrawGame()
         {
             _filterChanged |= ImGui.Checkbox("ARM9", ref _showArm9);
@@ -209,6 +297,10 @@ namespace Px86.NintendoDS.Emulator.Ui
                 _visible.Clear();
                 _next = 0;
             }
+            ImGui.SameLine();
+            if (ImGui.Button("Hooks..."))
+                ImGui.OpenPopup("hooks");
+            DrawHooks();
 
             if (_filterChanged)
             {
@@ -222,7 +314,8 @@ namespace Px86.NintendoDS.Emulator.Ui
             ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
             ImGui.TextWrapped(_ui.Host.Emulator == null
                 ? "Start a game first."
-                : $"{_visible.Count} of {_lines.Count} lines. Programs print with the no$gba debug ports (04FFFA10h-A1Ch) or \"mov r12,r12\" messages.");
+                : $"{_visible.Count} of {_lines.Count} lines: the no$gba debug ports (04FFFA10h-A1Ch), \"mov r12,r12\" messages, " +
+                  "and the game's own printf/sprintf calls (Hooks...).");
             ImGui.PopStyleColor();
             ImGui.Separator();
 

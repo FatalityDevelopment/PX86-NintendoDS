@@ -89,6 +89,10 @@ namespace Px86.NintendoDS.EmulatorCore
             DebugOutput = new DebugOutput(this);
             Arm9.NoCashMessage = DebugOutput.OnNoCashMessage;
             Arm7.NoCashMessage = DebugOutput.OnNoCashMessage;
+            Hooks = new FunctionHooks(this);
+            Hooks.Changed += FlushCode;
+            _blocks9.EndBefore = address => Hooks.IsHooked(0, address);
+            _blocks7.EndBefore = address => Hooks.IsHooked(1, address);
             Spi.Touch.Clock = () => Scheduler.CurrentTime;
             Spi.Touch.Amplifier = () => (Spi.Power.MicrophoneAmplifierOn, Spi.Power.MicrophoneGain);
             Cartridge = new CartridgeSlot(Scheduler, Irq9, Irq7, Dma9, Dma7);
@@ -178,6 +182,9 @@ namespace Px86.NintendoDS.EmulatorCore
 
         /// <summary>Text the game prints through the emulator debug ports and messages.</summary>
         public DebugOutput DebugOutput { get; }
+
+        /// <summary>printf/sprintf hooks that print what the game formats to <see cref="DebugOutput"/>.</summary>
+        public FunctionHooks Hooks { get; }
         public CartridgeSlot Cartridge { get; }
         public LcdController Lcd { get; }
         public Gpu2DEngine EngineA { get; }
@@ -513,6 +520,7 @@ namespace Px86.NintendoDS.EmulatorCore
             var debug = _debugger;
 
             bool cached = CpuMode != CpuMode.Interpreter && debug == null;
+            var hooks = Hooks.Active ? Hooks : null;
 
             // ARM9
             WakeIfPending(Arm9, Irq9);
@@ -523,6 +531,10 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm9Time = target;
                     break;
                 }
+                // Hooks see the PC before the instruction runs; with a debugger they
+                // run after the breakpoint check, so a resumed break doesn't print twice.
+                if (hooks != null && debug == null && !Arm9.IrqPending)
+                    hooks.OnExecute(0, Arm9);
                 if (cached && !Arm9.IrqPending && _blocks9.Get() is { } block9)
                 {
                     _arm9Time = RunBlock(Arm9, block9, _arm9Time, target, Dma9, 1);
@@ -530,6 +542,8 @@ namespace Px86.NintendoDS.EmulatorCore
                 }
                 if (debug != null && debug.CheckBreakpoint(0, Arm9.Pc))
                     return false;
+                if (hooks != null && debug != null && !Arm9.IrqPending)
+                    hooks.OnExecute(0, Arm9);
                 Scheduler.CurrentTime = _arm9Time;
                 _arm9Time += Arm9.Step();
                 if (Dma9.PendingCycles != 0)
@@ -550,6 +564,10 @@ namespace Px86.NintendoDS.EmulatorCore
                     _arm7Time = target;
                     break;
                 }
+                // Hooks see the PC before the instruction runs; with a debugger they
+                // run after the breakpoint check, so a resumed break doesn't print twice.
+                if (hooks != null && debug == null && !Arm7.IrqPending)
+                    hooks.OnExecute(1, Arm7);
                 if (cached && !Arm7.IrqPending && _blocks7.Get() is { } block7)
                 {
                     _arm7Time = RunBlock(Arm7, block7, _arm7Time, target, Dma7, 2);
@@ -557,6 +575,8 @@ namespace Px86.NintendoDS.EmulatorCore
                 }
                 if (debug != null && debug.CheckBreakpoint(1, Arm7.Pc))
                     return false;
+                if (hooks != null && debug != null && !Arm7.IrqPending)
+                    hooks.OnExecute(1, Arm7);
                 Scheduler.CurrentTime = _arm7Time;
                 _arm7Time += Arm7.Step() * 2;
                 if (Dma7.PendingCycles != 0)
@@ -644,6 +664,7 @@ namespace Px86.NintendoDS.EmulatorCore
             EngineA.OnVBlank();
             EngineB.OnVBlank();
             FrameCount++;
+            Hooks.OnFrame();
             _frameDone = true;
             FrameCompleted?.Invoke();
         }

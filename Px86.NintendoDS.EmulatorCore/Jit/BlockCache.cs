@@ -81,6 +81,9 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
 
         public void Clear() => _blocks.Clear();
 
+        /// <summary>Addresses a block must not run into (function hooks): a block ends before them, so the next one starts there.</summary>
+        public Func<uint, bool>? EndBefore { get; set; }
+
         /// <summary>The block starting at the CPU's PC, built if needed; null if that code can't be cached.</summary>
         public CachedBlock? Get()
         {
@@ -109,8 +112,11 @@ namespace Px86.NintendoDS.EmulatorCore.Jit
             var thumbHandlers = thumb ? new ThumbHandler[max] : null;
             int count = 0;
             var bus = _cpu.Bus;
+            var endBefore = EndBefore;
             for (uint address = pc; count < max; address += (uint)size)
             {
+                if (count > 0 && endBefore != null && endBefore(address))
+                    break;
                 if (thumb)
                 {
                     ushort op = bus.Fetch16(address);
