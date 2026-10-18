@@ -76,8 +76,9 @@ namespace Px86.NintendoDS.EmulatorCore.Cheats
 
         // ── Files ─────────────────────────────────────────────────────────────
 
+        // Create: without it .NET returns "" while ~/.config doesn't exist (a relative path).
         public static string DefaultFolder => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Px86.NintendoDS", "cheats");
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "Px86.NintendoDS", "cheats");
 
         public static string PathFor(NdsRom rom, string? folder = null) =>
             Path.Combine(folder ?? DefaultFolder, GameId(rom) + ".json");
