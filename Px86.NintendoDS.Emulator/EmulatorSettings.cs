@@ -121,6 +121,17 @@ namespace Px86.NintendoDS.Emulator
         /// <summary>DNS server the access point forwards to (a replacement Nintendo WFC service); empty = the PC's own.</summary>
         public string? OnlineDns { get; set; }
 
+        // ── Game output ───────────────────────────────────────────────────────
+
+        /// <summary>Show what the game formats with its printf/sprintf functions in the Log window.</summary>
+        public bool PrintfHooks { get; set; } = true;
+
+        /// <summary>Look for those functions in the game's code (hooks can also be added by hand).</summary>
+        public bool PrintfAutoScan { get; set; } = true;
+
+        /// <summary>Hooks added by hand, by game code: "arm9:0x02001234:sprintf".</summary>
+        public Dictionary<string, List<string>> GameHooks { get; set; } = new();
+
         // ── Remote control (CodeDesigner, debuggers) ──────────────────────────
 
         /// <summary>Open the PINE socket in the window too (headless server mode always opens it).</summary>

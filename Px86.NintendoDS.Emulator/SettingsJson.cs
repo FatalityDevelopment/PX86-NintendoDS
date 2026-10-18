@@ -48,6 +48,9 @@ namespace Px86.NintendoDS.Emulator
             Bool(nameof(EmulatorSettings.WirelessLan), Effect.Applied, s => s.WirelessLan, (s, v) => s.WirelessLan = v),
             Str(nameof(EmulatorSettings.OnlineDns), Effect.Applied, s => s.OnlineDns, (s, v) => s.OnlineDns = v),
 
+            Bool(nameof(EmulatorSettings.PrintfHooks), Effect.NextLoad, s => s.PrintfHooks, (s, v) => s.PrintfHooks = v),
+            Bool(nameof(EmulatorSettings.PrintfAutoScan), Effect.NextLoad, s => s.PrintfAutoScan, (s, v) => s.PrintfAutoScan = v),
+
             Int(nameof(EmulatorSettings.PinePort), Effect.Restart, 1, 65535, s => s.PinePort, (s, v) => s.PinePort = v),
             Int(nameof(EmulatorSettings.GsPort), Effect.Restart, 1, 65535, s => s.GsPort, (s, v) => s.GsPort = v),
             Choice(nameof(EmulatorSettings.GsCodec), Effect.Restart, new[] { "jpeg", "png", "raw" }, s => s.GsCodec, (s, v) => s.GsCodec = v),

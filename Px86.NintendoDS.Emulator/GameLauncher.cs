@@ -34,6 +34,9 @@ namespace Px86.NintendoDS.Emulator
             CpuMode = _settings.CpuMode,
             FirmwareWritesPath = FirmwareWritesPathFor(NullIfEmpty(_settings.FirmwarePath)),
             MacInstance = WirelessServices.InstanceNumber,
+            PrintfHooks = _settings.PrintfHooks,
+            PrintfAutoScan = _settings.PrintfAutoScan,
+            Hooks = HooksWithCommandLine(),
             Profile = new FirmwareFlash.UserProfile
             {
                 Nickname = string.IsNullOrWhiteSpace(_settings.Nickname) ? "Px86" : _settings.Nickname,
@@ -44,6 +47,17 @@ namespace Px86.NintendoDS.Emulator
                 FavoriteColor = Math.Clamp(_settings.FavoriteColor, 0, 15),
             },
         };
+
+        /// <summary>Hooks from --hook: every game, this run only (not saved).</summary>
+        public List<string> CommandLineHooks { get; } = new();
+
+        private Dictionary<string, List<string>> HooksWithCommandLine()
+        {
+            var hooks = _settings.GameHooks.ToDictionary(kv => kv.Key, kv => kv.Value.ToList());
+            if (CommandLineHooks.Count > 0)
+                hooks["*"] = (hooks.TryGetValue("*", out var all) ? all : new List<string>()).Concat(CommandLineHooks).ToList();
+            return hooks;
+        }
 
         /// <summary>Start a game on the host (replacing the running one). Reports problems through <see cref="Message"/>.</summary>
         public bool Load(string romPath, string? savePath = null)
@@ -63,6 +77,7 @@ namespace Px86.NintendoDS.Emulator
             try
             {
                 var session = GameSession.Start(options);
+                session.Emulator.Hooks.Log += message => Message?.Invoke(message);
                 var header = session.Rom.Header;
                 Message?.Invoke($"{header.Title} [{header.GameCode}]");
                 foreach (var message in session.Messages)

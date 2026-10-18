@@ -1,3 +1,4 @@
+using Px86.NintendoDS.EmulatorCore.Debugging;
 using Px86.NintendoDS.EmulatorCore.Hosting;
 using Px86.NintendoDS.EmulatorCore.Remote;
 using Px86.NintendoDS.TestProject.Emulator;
@@ -298,6 +299,30 @@ namespace Px86.NintendoDS.TestProject.Remote
                 Assert.IsTrue(File.Exists(Path.Combine(f.Folder, "cheats", EmulatorCore.Cheats.CheatList.GameId(f.Host.Emulator!.Rom!) + ".json")), "list saved per game");
                 Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.CheatClear))[4], "clear");
                 Assert.AreEqual(0u, U32(c.Send(Cmd(PineOpcodes.CheatList)), 5), "empty");
+            }
+        }
+
+        [TestMethod]
+        public void HookOpcodesManageTheHooks()
+        {
+            var (f, pine, c) = Start();
+            using (f) using (pine) using (c)
+            {
+                WaitForDone(f);
+                int before = (int)U32(c.Send(Cmd(PineOpcodes.HookList)), 5);
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.HookAdd, (byte)1, 0x0380ABCDu, (byte)HookKind.SPrintf))[4], "add");
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.HookAdd, (byte)2, 0x02000000u, (byte)0))[4], "bad cpu");
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.HookAdd, (byte)0, 0x02000000u, (byte)99))[4], "bad kind");
+
+                var list = c.Send(Cmd(PineOpcodes.HookList));
+                Assert.AreEqual((uint)before + 1, U32(list, 5), "one more hook");
+                int at = Enumerable.Range(0, before + 1).Select(i => 9 + i * 7).First(o => list[o] == 1 && U32(list, o + 1) == 0x0380ABCC);
+                Assert.AreEqual((byte)HookKind.SPrintf, list[at + 5], "kind");
+                Assert.AreEqual(0, list[at + 6], "added by hand");
+
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.HookRemove, (byte)1, 0x0380ABCCu))[4], "remove");
+                Assert.AreEqual(Fail, c.Send(Cmd(PineOpcodes.HookRemove, (byte)1, 0x0380ABCCu))[4], "already gone");
+                Assert.AreEqual((uint)before, U32(c.Send(Cmd(PineOpcodes.HookList)), 5));
             }
         }
     }

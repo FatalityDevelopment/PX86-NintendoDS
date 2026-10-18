@@ -96,6 +96,9 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
         public const byte CaptureGx = 0x6F;
         public const byte GetSettings = 0x70;
         public const byte SetSettings = 0x71;
+        public const byte HookList = 0x72;
+        public const byte HookAdd = 0x73;
+        public const byte HookRemove = 0x74;
 
         // ── Result codes ──────────────────────────────────────────────────────
         public const byte IpcOk = 0x00;

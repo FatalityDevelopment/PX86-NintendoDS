@@ -34,6 +34,15 @@ namespace Px86.NintendoDS.EmulatorCore
         /// two copies started from the same firmware apart.
         /// </summary>
         public int MacInstance { get; init; }
+
+        /// <summary>Capture text from the game's printf/sprintf functions (<see cref="Debugging.FunctionHooks"/>).</summary>
+        public bool PrintfHooks { get; init; } = true;
+
+        /// <summary>Look for printf-style formatters in the loaded code.</summary>
+        public bool PrintfAutoScan { get; init; } = true;
+
+        /// <summary>Hooks added by hand ("arm9:0x02001234:sprintf"), by game code; "*" applies to every game.</summary>
+        public IReadOnlyDictionary<string, List<string>>? Hooks { get; init; }
     }
 
     /// <summary>
@@ -146,6 +155,20 @@ namespace Px86.NintendoDS.EmulatorCore
                 case DirectBoot.SecureArea.DecryptionFailed:
                     session.Messages.Add("WARNING: the secure area could not be decrypted (bad BIOS dump or corrupt ROM).");
                     break;
+            }
+            emulator.Hooks.Enabled = options.PrintfHooks;
+            emulator.Hooks.AutoScan = options.PrintfAutoScan;
+            foreach (string key in new[] { "*", rom.Header.GameCode })
+            {
+                if (options.Hooks == null || !options.Hooks.TryGetValue(key, out var specs))
+                    continue;
+                foreach (string spec in specs)
+                {
+                    if (Debugging.FunctionHooks.TryParse(spec, out var cpu, out uint address, out var kind))
+                        emulator.Hooks.Add(cpu, address, kind);
+                    else
+                        session.Messages.Add($"WARNING: ignored the hook \"{spec}\" (expected arm9|arm7:address:kind).");
+                }
             }
             emulator.FrameCompleted += session.OnFrame;
             return session;

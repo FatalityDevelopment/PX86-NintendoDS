@@ -155,6 +155,9 @@ Notes on specific opcodes:
 | 6F | CaptureGx | len u16, UTF-8 path | — (records the next 3D frame to a `.gxcap` file; see the emulator guide) |
 | 70 | GetSettings | — | string: the settings as JSON (below) |
 | 71 | SetSettings | len u16, UTF-8 JSON (only the keys to change) | string: `{"applied":[…],"nextLoad":[…],"restart":[…]}` (FAIL on bad JSON or values) |
+| 72 | HookList | — | count u32, then {cpu u8 (0 ARM9, 1 ARM7), address u32, kind u8, automatic u8 (1 = found by the scanner)}. Kinds: 0 printf, 1 vprintf, 2 sprintf, 3 vsprintf, 4 snprintf, 5 vsnprintf, 6 putstring, 7 auto |
+| 73 | HookAdd | cpu u8, address u32, kind u8 | — (FAIL without a game or with a bad cpu/kind). For this run only; the Log window saves hooks per game |
+| 74 | HookRemove | cpu u8, address u32 | — (FAIL if there was no hook there) |
 
 #### Settings (0x70/0x71)
 
@@ -170,6 +173,7 @@ frontend (an `EmulatorCore` host on its own).
 | `WirelessMode` (`Off`/`Local`/`Online`), `WirelessPort`, `WirelessLan`, `OnlineDns` | | applied |
 | `Bios9Path`, `Bios7Path`, `FirmwarePath` (empty = none), `UseRealBios`, `SaveDirectory` | | nextLoad |
 | `Nickname` (≤ 10), `Message` (≤ 26), `BirthMonth`, `BirthDay`, `Language` (0 JP, 1 EN, 2 FR, 3 DE, 4 IT, 5 ES), `FavoriteColor` (0–15) | | nextLoad (generated firmware) |
+| `PrintfHooks`, `PrintfAutoScan` (printf/sprintf output in the Log window) | bool | nextLoad |
 | `PinePort`, `GsPort`, `GsCodec` (`jpeg`/`png`/`raw`), `GsQuality` | | restart |
 
 `nextLoad` keys apply when the next game is loaded (LoadRom); `restart` keys when the emulator next starts.

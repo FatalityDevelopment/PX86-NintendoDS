@@ -244,6 +244,20 @@ namespace Px86.NintendoDS.EmulatorCore.Debugging
             return null;
         }
 
+        /// <summary>Print text from a hooked printf: it becomes lines at each line feed, like port output.</summary>
+        public void Print(DebugCpu cpu, string text) => Append(cpu, text);
+
+        /// <summary>Print one whole line (hooked sprintf): text still pending on that CPU is closed first.</summary>
+        public void PrintLine(DebugCpu cpu, string text)
+        {
+            lock (_lock)
+            {
+                if (_pending[(int)cpu].Length > 0)
+                    Flush(cpu);
+            }
+            Append(cpu, text + "\n");
+        }
+
         private void Append(DebugCpu cpu, string text)
         {
             var finished = new List<DebugLine>();

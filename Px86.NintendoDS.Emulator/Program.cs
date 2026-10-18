@@ -59,6 +59,7 @@ namespace Px86.NintendoDS.Emulator
 
             using var host = new EmulatorHost();
             var launcher = new GameLauncher(host, settings);
+            launcher.CommandLineHooks.AddRange(cl.Hooks);
             launcher.Message += m => Console.WriteLine("  " + m);
 
             GameSession? session = null;

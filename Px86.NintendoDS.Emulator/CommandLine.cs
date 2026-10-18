@@ -29,6 +29,7 @@ namespace Px86.NintendoDS.Emulator
     ///     --wifi-lan            Local wireless across the LAN, not just this PC
     ///     --dns &lt;ip&gt;            DNS server for online play (a replacement WFC service)
     ///     --trace-io            Log unhandled I/O register accesses
+    ///     --hook &lt;spec&gt;         Show what a game function prints: [arm9|arm7:]address[:kind] (repeatable)
     ///     --save-settings       Store the given BIOS/firmware/scale options as defaults
     /// </summary>
     public sealed class CommandLine
@@ -57,6 +58,7 @@ namespace Px86.NintendoDS.Emulator
         public bool WirelessLan { get; private set; }
         public string? Dns { get; private set; }
         public string? ReplayGxPath { get; private set; }
+        public List<string> Hooks { get; } = new();
 
         /// <summary>Headless without a fixed frame count: keep running and serve PINE/GS.</summary>
         public bool ServerMode => Headless && Frames == null && ScreenshotPath == null;
@@ -94,6 +96,14 @@ namespace Px86.NintendoDS.Emulator
                     case "--frames": cl.Frames = int.Parse(Next()); break;
                     case "--screenshot": cl.ScreenshotPath = Next(); break;
                     case "--trace-io": cl.TraceIo = true; break;
+                    case "--hook":
+                    {
+                        string spec = Next();
+                        if (!EmulatorCore.Debugging.FunctionHooks.TryParse(spec, out _, out _, out _))
+                            throw new ArgumentException($"--hook {spec}: expected [arm9|arm7:]address[:kind], kind = printf, sprintf, vsnprintf...");
+                        cl.Hooks.Add(spec);
+                        break;
+                    }
                     case "--pine": cl.Pine = true; cl.PinePort = OptionalPort() ?? cl.PinePort; break;
                     case "--gs": cl.Gs = true; cl.GsPort = OptionalPort() ?? cl.GsPort; break;
                     case "--no-pine": cl.Pine = false; break;
@@ -179,6 +189,8 @@ namespace Px86.NintendoDS.Emulator
               --replay-gx <file>    Re-render a GX capture (F9) to --screenshot (or <file>.png)
                                     and write a polygon/command dump to <file>.txt
               --trace-io            Log unhandled I/O register accesses
+              --hook <spec>         Show what a game function prints in the Log window: [arm9|arm7:]address[:kind]
+                                    kind = printf, vprintf, sprintf, vsprintf, snprintf, vsnprintf, putstring, auto
               --save-settings       Remember the BIOS/firmware/scale options
 
             Controls (default): arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,

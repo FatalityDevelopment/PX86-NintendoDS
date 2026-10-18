@@ -165,8 +165,10 @@ whoever fixes the bug.
 
 ## Game debug output (Log window)
 
-**Tools → Log** (Ctrl+L) shows what programs print through the emulator debug channels that homebrew, debug
-builds and test programs use. It works on both CPUs:
+**Tools → Log** (Ctrl+L) has two tabs. **Emulator** shows Px86's own messages (game loaded, BIOS, firmware,
+saves, PINE/GS connections, wireless, warnings, errors). **Game output** shows what the game prints, on both
+CPUs: through its own printf/sprintf functions (below), and through the emulator debug channels that
+homebrew, debug builds and test programs use:
 
 | Channel | How to print |
 |---|---|
@@ -180,7 +182,34 @@ builds and test programs use. It works on both CPUs:
 - **ID and cycle counter:** 04FFFA00h reads "no$gba Px86" (libraries check the "no$gba" prefix), and
   04FFFA20h reads the CPU's cycle counter.
 - **Using the window:** filter by CPU or text, pause the view, copy everything to the clipboard, or clear it.
-- **Retail games:** commercial games normally strip their printf output, so they usually show nothing here.
+
+### printf/sprintf hooks
+
+Retail games strip their debug output, but they still format text with sprintf-style functions. As
+PCSX2 does for PS2 games, Px86 hooks those functions. When a CPU reaches one, Px86 reads the format
+string and arguments from r0–r3, the stack or the va_list, and prints the result. The game itself is
+not changed. Lines from sprintf-style calls start with `[sprintf]`.
+
+- **Found automatically:** after boot, and every 5 seconds for overlays, Px86 scans main RAM, ITCM and
+  ARM7 WRAM for printf-style formatters (such as the SDK's `OS_VSNPrintf` or a C library's `vsnprintf`).
+  Each one found is reported in the Emulator tab ("Hooked a printf-style formatter on the ARM9 at …").
+  The scan is a heuristic: it looks for code that compares the format character with '%' and then with
+  conversion letters and flags. It finds the usual compiler output, not every possible formatter.
+- **Added by hand:** in **Game output → Hooks...**, give the CPU, the address of the function's first
+  instruction (from the debugger or a CodeDesigner label) and its kind. Hooks you add are saved per game
+  code (`GameHooks` in `settings.json`). You can also pass `--hook arm9:0x0201A3C4:sprintf` (repeatable)
+  for one run, or use PINE `HookAdd`.
+
+| Kind | Arguments |
+|---|---|
+| `printf` / `vprintf` | fmt in r0, then the varargs / a va_list in r1 |
+| `sprintf` / `vsprintf` | buffer in r0, fmt in r1 |
+| `snprintf` / `vsnprintf` | buffer in r0, size in r1, fmt in r2 |
+| `putstring` | a plain string in r0 |
+| `auto` | a va_list formatter whose argument order isn't known; each call picks the layout from which register holds a string |
+
+Turn the hooks or the scan off in the same popup (`PrintfHooks`, `PrintfAutoScan`). A call that goes
+through several hooked functions (sprintf → vsprintf → vsnprintf) is printed once.
 
 ## Microphone
 
