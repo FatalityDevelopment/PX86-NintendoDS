@@ -29,6 +29,7 @@ Px86.NintendoDS.sln
 │   ├── Cpu/Thumb/                   # Thumb handlers + 1024-entry decode table
 │   ├── Cpu/Coprocessors/Cp15.cs     # ARM9 system control coprocessor (TCM, vectors, halt)
 │   ├── Disassembler/                # ARM and Thumb disassemblers
+│   ├── Assembler/                   # ARM and Thumb assemblers (read the disassembler's text back; llvm-mc checked)
 │   └── Interfaces/                  # IArmMemoryBus, ICoprocessor
 ├── Px86.NintendoDS.FileFormats/     # .nds header/NitroFS, CRC16, PNG + JPEG writers
 ├── Px86.NintendoDS.EmulatorCore/    # The console
