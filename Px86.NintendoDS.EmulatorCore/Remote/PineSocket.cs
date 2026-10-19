@@ -686,6 +686,76 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
                     return _host.CaptureGx(path, (file, error) =>
                         Log?.Invoke(error == null ? $"[PINE] GX capture written to {file}" : $"[PINE] GX capture failed: {error.Message}"));
                 }
+                // ── Code analysis (ExecutionTracker, StringScanner) ──
+                case PineOpcodes.TrackerControl:
+                {
+                    byte action = rq.U8();
+                    if (nds == null || action > 3) return false;
+                    if (action == 2) nds.Tracker.Clear();
+                    else if (action != 3) nds.Tracker.Enabled = action == 1;
+                    rp.U8(nds.Tracker.Enabled ? (byte)1 : (byte)0);
+                    return true;
+                }
+                case PineOpcodes.GetCoverage:
+                {
+                    uint start = rq.U32(), length = rq.U32();
+                    if (nds == null || length > 0x400000) return false;
+                    var bits = nds.Tracker.Coverage(cpu, start, (int)length);
+                    rp.U32((uint)bits.Length);
+                    rp.Raw(bits);
+                    return true;
+                }
+                case PineOpcodes.GetCallStack:
+                {
+                    if (nds == null) return false;
+                    var frames = nds.Tracker.CallStack(cpu);
+                    rp.U32((uint)frames.Count);
+                    foreach (var f in frames)
+                    {
+                        rp.U32(f.CallSite);
+                        rp.U32(f.Target);
+                        rp.U32(f.ReturnAddress);
+                        rp.U32(f.StackPointer);
+                        rp.U8((byte)((f.Thumb ? 1 : 0) | (f.Interrupt ? 2 : 0)));
+                    }
+                    return true;
+                }
+                case PineOpcodes.GetCallCounts:
+                {
+                    int max = rq.U16();
+                    if (nds == null) return false;
+                    var counts = nds.Tracker.CallCounts(cpu, max == 0 ? 100 : max);
+                    rp.U32((uint)counts.Count);
+                    foreach (var (target, calls) in counts)
+                    {
+                        rp.U32(target);
+                        rp.U64((ulong)calls);
+                    }
+                    return true;
+                }
+                case PineOpcodes.ScanStrings:
+                {
+                    uint start = rq.U32(), length = rq.U32();
+                    int min = rq.U8();
+                    if (nds == null || length is 0 or > 0x1000000) return false;
+                    var data = new byte[length];
+                    if (start == 0x02000000 && length <= NdsEmulator.MainRamSize)
+                        nds.MainRam.AsSpan(0, (int)length).CopyTo(data);
+                    else
+                        DebugMemory.ReadBlock(nds, cpu, start, data);
+                    var found = StringScanner.Scan(data, start, Math.Max(min, 2));
+                    int count = Math.Min(found.Count, 20000);
+                    rp.U32((uint)count);
+                    foreach (var s in found.Take(count))
+                    {
+                        var text = System.Text.Encoding.UTF8.GetBytes(s.Text.Length > 255 ? s.Text[..255] : s.Text);
+                        rp.U32(s.Address);
+                        rp.U16((ushort)s.Length);
+                        rp.U8((byte)text.Length);
+                        rp.Raw(text);
+                    }
+                    return true;
+                }
                 case PineOpcodes.HookList:
                 {
                     if (nds == null) return false;

@@ -183,6 +183,9 @@ namespace Px86.NintendoDS.EmulatorCore
         /// <summary>Text the game prints through the emulator debug ports and messages.</summary>
         public DebugOutput DebugOutput { get; }
 
+        /// <summary>Coverage, shadow call stack and call counts for code analysis (off by default).</summary>
+        public ExecutionTracker Tracker { get; } = new();
+
         /// <summary>printf/sprintf hooks that print what the game formats to <see cref="DebugOutput"/>.</summary>
         public FunctionHooks Hooks { get; }
         public CartridgeSlot Cartridge { get; }
@@ -519,7 +522,8 @@ namespace Px86.NintendoDS.EmulatorCore
                 target = Scheduler.Now + 1;
             var debug = _debugger;
 
-            bool cached = CpuMode != CpuMode.Interpreter && debug == null;
+            var tracker = Tracker.Enabled ? Tracker : null;
+            bool cached = CpuMode != CpuMode.Interpreter && debug == null && tracker == null;
             var hooks = Hooks.Active ? Hooks : null;
 
             // ARM9
@@ -545,7 +549,9 @@ namespace Px86.NintendoDS.EmulatorCore
                 if (hooks != null && debug != null && !Arm9.IrqPending)
                     hooks.OnExecute(0, Arm9);
                 Scheduler.CurrentTime = _arm9Time;
+                tracker?.Before(0, Arm9);
                 _arm9Time += Arm9.Step();
+                tracker?.After(0, Arm9);
                 if (Dma9.PendingCycles != 0)
                 {
                     _arm9Time += Dma9.PendingCycles;
@@ -578,7 +584,9 @@ namespace Px86.NintendoDS.EmulatorCore
                 if (hooks != null && debug != null && !Arm7.IrqPending)
                     hooks.OnExecute(1, Arm7);
                 Scheduler.CurrentTime = _arm7Time;
+                tracker?.Before(1, Arm7);
                 _arm7Time += Arm7.Step() * 2;
+                tracker?.After(1, Arm7);
                 if (Dma7.PendingCycles != 0)
                 {
                     _arm7Time += Dma7.PendingCycles * 2;

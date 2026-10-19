@@ -29,6 +29,7 @@ Px86.NintendoDS.sln
 │   ├── Cpu/Thumb/                   # Thumb handlers + 1024-entry decode table
 │   ├── Cpu/Coprocessors/Cp15.cs     # ARM9 system control coprocessor (TCM, vectors, halt)
 │   ├── Disassembler/                # ARM and Thumb disassemblers
+│   ├── Assembler/                   # ARM and Thumb assemblers (read the disassembler's text back; llvm-mc checked)
 │   └── Interfaces/                  # IArmMemoryBus, ICoprocessor
 ├── Px86.NintendoDS.FileFormats/     # .nds header/NitroFS, CRC16, PNG + JPEG writers
 ├── Px86.NintendoDS.EmulatorCore/    # The console
@@ -37,7 +38,7 @@ Px86.NintendoDS.sln
 │   ├── Arm9MemoryBus.cs / Arm7MemoryBus.cs   # Memory maps + I/O dispatch
 │   ├── DirectBoot.cs, GameSession.cs
 │   ├── Hosting/EmulatorHost.cs      # Runs the console on its own thread; thread-safe control (Invoke, pause, step…)
-│   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory access, game debug output (no$gba ports), string scanner
+│   ├── Debugging/                   # Breakpoints/watchpoints (DebugMonitor), debug memory, game debug output (no$gba ports), printf hooks, string scanner, ExecutionTracker (coverage, call stack)
 │   ├── Remote/                      # PINE socket (28013) + GS frame stream (28014), see docs/pine-protocol.md
 │   ├── Network/                     # Local wireless (UDP multicast), software access point + NAT router (online)
 │   ├── Hardware/                    # IRQ, timers, DMA, IPC, math, keypad, RTC, SPI/, Wifi/, system control

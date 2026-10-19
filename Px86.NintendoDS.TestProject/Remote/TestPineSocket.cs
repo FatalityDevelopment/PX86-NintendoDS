@@ -325,5 +325,41 @@ namespace Px86.NintendoDS.TestProject.Remote
                 Assert.AreEqual((uint)before, U32(c.Send(Cmd(PineOpcodes.HookList)), 5));
             }
         }
+
+        [TestMethod]
+        public void AnalysisOpcodesReportTrackerAndStrings()
+        {
+            var (f, pine, c) = Start("calltest", paused: true);
+            using (f) using (pine) using (c)
+            {
+                Assert.AreEqual(1, c.Send(Cmd(PineOpcodes.TrackerControl, (byte)1))[5], "tracking on before the game runs");
+                c.Send(Cmd(PineOpcodes.Resume));
+                f.WaitFor(() => f.Host.Invoke(() => f.Host.Emulator!.Tracker.CallStack(DebugCpu.Arm9).Count >= 5), "the ROM to reach wait_here");
+                uint wait = f.Host.Invoke(() => f.Host.Emulator!.Arm9Bus.BusRead32(0x02300010));
+
+                var stack = c.Send(Cmd(PineOpcodes.GetCallStack));
+                Assert.IsTrue(U32(stack, 5) >= 5, "frames");
+                Assert.AreEqual(wait, U32(stack, 9 + 4), "innermost frame's target is wait_here");
+
+                var coverage = c.Send(Cmd(PineOpcodes.GetCoverage, wait, 4u));
+                Assert.AreEqual(1u, U32(coverage, 5), "one bitmap byte for 2 halfwords");
+                Assert.AreEqual(1, coverage[9] & 1, "wait_here ran");
+
+                c.Send(Cmd(PineOpcodes.Write32, 0x02300014u, 1u));
+                f.WaitFor(() => f.Host.Invoke(() => f.Host.Emulator!.Arm9Bus.BusRead32(0x02300000)) == 0x600DF00D, "the ROM to finish");
+                var counts = c.Send(Cmd(PineOpcodes.GetCallCounts, (ushort)3));
+                Assert.AreEqual(3u, U32(counts, 5));
+                Assert.AreEqual(10ul, BitConverter.ToUInt64(counts, 9 + 4), "leaf is the most called (10 times)");
+
+                Assert.AreEqual(Ok, c.Send(Cmd(PineOpcodes.TrackerControl, (byte)2))[4], "clear");
+                Assert.AreEqual(0u, U32(c.Send(Cmd(PineOpcodes.GetCallCounts, (ushort)0)), 5));
+                Assert.AreEqual(0, c.Send(Cmd(PineOpcodes.TrackerControl, (byte)0))[5], "tracking off");
+
+                var strings = c.Send(Cmd(PineOpcodes.ScanStrings, 0x027FFE00u, 0x200u, (byte)4));
+                Assert.IsTrue(U32(strings, 5) >= 1, "the header copy's game title");
+                int len = strings[9 + 6];
+                StringAssert.Contains(System.Text.Encoding.UTF8.GetString(strings, 9 + 7, len), "calltest", "title of calltest");
+            }
+        }
     }
 }

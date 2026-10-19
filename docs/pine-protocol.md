@@ -158,6 +158,11 @@ Notes on specific opcodes:
 | 72 | HookList | — | count u32, then {cpu u8 (0 ARM9, 1 ARM7), address u32, kind u8, automatic u8 (1 = found by the scanner)}. Kinds: 0 printf, 1 vprintf, 2 sprintf, 3 vsprintf, 4 snprintf, 5 vsnprintf, 6 putstring, 7 auto |
 | 73 | HookAdd | cpu u8, address u32, kind u8 | — (FAIL without a game or with a bad cpu/kind). For this run only; the Log window saves hooks per game |
 | 74 | HookRemove | cpu u8, address u32 | — (FAIL if there was no hook there) |
+| 75 | TrackerControl | action u8 (0 off, 1 on, 2 clear, 3 query) | enabled u8. While on, both CPUs are interpreted (no cached blocks) so every instruction is seen |
+| 76 | GetCoverage | start u32, length u32 (≤ 4 MB) | byte count u32, then a bitmap: bit i (LSB first) = an instruction started at start + 2i. Selected CPU |
+| 77 | GetCallStack | — | count u32, then innermost first {callSite u32, target u32 (bit 0 = Thumb), return u32, sp u32, flags u8 (1 = caller was Thumb, 2 = exception entry)}. Selected CPU |
+| 78 | GetCallCounts | max u16 (0 = 100) | count u32, then most called first {target u32, calls u64}. Selected CPU |
+| 79 | ScanStrings | start u32, length u32 (≤ 16 MB), minLength u8 | count u32 (≤ 20000), then {address u32, length u16, text length u8, UTF-8 text (≤ 255 bytes)}. Selected CPU's view, no side effects |
 
 #### Settings (0x70/0x71)
 

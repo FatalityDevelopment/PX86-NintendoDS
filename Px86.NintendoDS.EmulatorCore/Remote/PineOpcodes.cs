@@ -99,6 +99,11 @@ namespace Px86.NintendoDS.EmulatorCore.Remote
         public const byte HookList = 0x72;
         public const byte HookAdd = 0x73;
         public const byte HookRemove = 0x74;
+        public const byte TrackerControl = 0x75;
+        public const byte GetCoverage = 0x76;
+        public const byte GetCallStack = 0x77;
+        public const byte GetCallCounts = 0x78;
+        public const byte ScanStrings = 0x79;
 
         // ── Result codes ──────────────────────────────────────────────────────
         public const byte IpcOk = 0x00;
